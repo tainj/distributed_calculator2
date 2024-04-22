@@ -35,3 +35,6 @@ go run cmd/client/client_calculator.go
 ## Функционал проекта
 От
 
+## Обратная связь
+[почта](leshyovantoha@yandex.ru)
+[телеграм](https://t.me/sadlarfox)
