@@ -1,0 +1,50 @@
+syntax = "proto3"; // версия proto файлов
+package calculator; // название пакета
+option go_package = "github.com/tantoni228/distributed_calculator2/proto";
+
+// Сообщение описывающий простой пример
+message SimpleExpression {
+    string sign = 1;
+    int32 a = 2;
+    int32 b = 3;
+    string letter = 4;
+
+}
+// Сообщение для описания результата вычисления простого примера
+message ValueSimpleExpression {
+    int32 result = 1;
+    string letter = 2;
+    int32 status = 4;
+}
+// Сообщение для описания мониторинга к серверу
+message RequestServer {
+    int32 port = 1;
+}
+// Сообщение для описание состояния сервера
+message MonitoringServer {
+    int32 status = 1;
+}
+
+message Form {
+    string login = 1;
+    string password = 2;
+}
+
+message GiveToken {
+    int32 status = 1;
+    string token = 2;
+}
+
+message AuthorizationStatus {
+    int32 status = 1;
+}
+
+service Distributed_calculator {
+    rpc Calculation (SimpleExpression) returns (ValueSimpleExpression); 
+    rpc Monitoring (RequestServer) returns (MonitoringServer);
+}
+
+service Authentication_server {
+    rpc Authorization (Form) returns (AuthorizationStatus); 
+    rpc Authentication (Form) returns (GiveToken);
+}
