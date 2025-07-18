@@ -15,14 +15,14 @@ var (
 )
 
 var (
-	OperatorPriority = map[rune]int{
-		'(': 0,
-        '+': 1,
-        '-': 1,
-        '*': 2,
-        '/': 2,
-        '^': 3,
-        '~': 4,
+	OperatorPriority = map[string]int{
+		"(": 0,
+        "+": 1,
+        "-": 1,
+        "*": 2,
+        "/": 2,
+        "^": 3,
+        "~": 4,
 	}
 )
 
@@ -61,14 +61,14 @@ func (s *SimpleExample) Calculate() (float64, error) {
 }
 
 type Stack struct {
-	list []rune
+	list []string
 }
 
 func NewStack() *Stack {
-	return &Stack{list: make([]rune, 0)}
+	return &Stack{list: make([]string, 0)}
 }
 
-func (s *Stack) Push(item rune) {
+func (s *Stack) Push(item string) {
 	s.list = append(s.list, item)
 }
 
@@ -79,14 +79,14 @@ func (s *Stack) IsEmptyStack() bool {
 	return false
 }
 
-func (s *Stack) Pop() rune {
+func (s *Stack) Pop() string {
 	index := len(s.list) - 1
 	result := s.list[index]
 	s.list = s.list[:index]
 	return result
 }
 
-func (s *Stack) Peek() rune {
+func (s *Stack) Peek() string {
 	index := len(s.list) - 1
 	return s.list[index]
 }
@@ -102,40 +102,41 @@ func NewExample(str string) *Example {
 
 
 func (s *Example) Convert() (string, error) {
-	list := make([]rune, 0)
+	list := make([]string, 0)
 	stack := NewStack()
 	example := strings.ReplaceAll(s.InfixExpr, " ", "")
 	for _, i := range example {
 		if unicode.IsDigit(i) {
-			list = append(list, i)
+			list = append(list, string(i))
 		}
 		for key, value := range OperatorPriority {
-			if key == i {
+			sign := string(i)
+			if key == sign {
 				if stack.IsEmptyStack() {
-					stack.Push(i)
+					stack.Push(sign)
 					continue
 				}
-				if OperatorPriority[i] > OperatorPriority[stack.Peek()] {
-					stack.Push(i)
+				if OperatorPriority[sign] > OperatorPriority[stack.Peek()] {
+					stack.Push(sign)
 					continue
 				}
-				if OperatorPriority[i] == value {
+				if OperatorPriority[sign] == value {
 					list = append(list, stack.Pop())
-					stack.Push(i)
+					stack.Push(sign)
 				}
 			}
 		}
 		if i == ')' {
-			for stack.Peek() != '(' {
+			for stack.Peek() != "(" {
 				list = append(list, stack.Pop())
 			}
+			stack.Pop()
 		}
 	}
 	for !stack.IsEmptyStack() {
 		list = append(list, stack.Pop())
 	}
-	fmt.Println(list)
-	return string(list), nil
+	return strings.Join(list, " "), nil
 }
 
 
