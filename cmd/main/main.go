@@ -9,20 +9,20 @@ import (
 )
 
 var (
-	ErrDivisionByZero = errors.New("You can't divide by zero.")
+	ErrDivisionByZero       = errors.New("You can't divide by zero.")
 	ErrNonExistingOperation = errors.New("This operation does not exist or has not been implemented.")
-	ErrCovertExample = errors.New("This line is not a mathematical expression or contains an error.")
+	ErrCovertExample        = errors.New("This line is not a mathematical expression or contains an error.")
 )
 
 var (
 	OperatorPriority = map[string]int{
-		"(": 0,
-        "+": 1,
-        "-": 1,
-        "*": 2,
-        "/": 2,
-        "^": 3,
-        "~": 4,
+		"(": 6,
+		"+": 1,
+		"-": 1,
+		"*": 2,
+		"/": 2,
+		"^": 3,
+		"~": 4,
 	}
 )
 
@@ -100,7 +100,6 @@ func NewExample(str string) *Example {
 	return &Example{InfixExpr: str}
 }
 
-
 func (s *Example) Convert() (string, error) {
 	// инициализация списка, стека и списка для чисел
 	list := make([]string, 0)
@@ -110,7 +109,7 @@ func (s *Example) Convert() (string, error) {
 	for _, i := range example {
 		sign := string(i)
 		if unicode.IsDigit(i) { // проверяем является ли символ цифрой
-			number = append(number, i)  // добавляем в список для чисел
+			number = append(number, i) // добавляем в список для чисел
 			continue
 		} else {
 			if len(number) != 0 {
@@ -118,22 +117,16 @@ func (s *Example) Convert() (string, error) {
 				number = make([]rune, 0)
 			}
 		}
-		for key, value := range OperatorPriority {
-			if key == sign { // добавляем в стек знак операции, если стек пустой
-				if stack.IsEmptyStack() {
-					stack.Push(sign)
-					break
-				}
-				if value > OperatorPriority[stack.Peek()] { // если 
-					stack.Push(sign)
-					break
-				}
-				if value == OperatorPriority[stack.Peek()] {
-					list = append(list, stack.Pop())
-					stack.Push(sign)
+		if value, isOperator := OperatorPriority[sign]; isOperator {
+			for !stack.IsEmptyStack() {
+				top := stack.Peek()
+				if top != "(" && OperatorPriority[top] >= value {
+					list = append(list, stack.Pop()) // извлекаем оператор из стека
+				} else {
 					break
 				}
 			}
+			stack.Push(sign) // Добавляем текущий оператор в стек
 		}
 		if i == ')' {
 			for stack.Peek() != "(" {
@@ -142,18 +135,20 @@ func (s *Example) Convert() (string, error) {
 			stack.Pop()
 		}
 	}
+	if len(number) > 0 {
+		list = append(list, string(number)) // добавляем последние число, если имеется
+	}
 	for !stack.IsEmptyStack() {
 		list = append(list, stack.Pop())
 	}
 	return strings.Join(list, " "), nil
 }
 
-
 func main() {
 	// s := NewExample("3 + 4 * 2 / (1 - 5)")
 	// fmt.Println(s.Convert())
 	// s2 := NewExample("10 + 25 * (3 - 4)")
 	// fmt.Println(s2.Convert())
-	s3 := NewExample("10 + (25 * (3 - 4) + 5)")
+	s3 := NewExample("100 + 25 * (3 - 4) + 5")
 	fmt.Println(s3.Convert())
 }
