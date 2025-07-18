@@ -102,27 +102,36 @@ func NewExample(str string) *Example {
 
 
 func (s *Example) Convert() (string, error) {
+	// инициализация списка, стека и списка для чисел
 	list := make([]string, 0)
 	stack := NewStack()
-	example := strings.ReplaceAll(s.InfixExpr, " ", "")
+	example := strings.ReplaceAll(s.InfixExpr, " ", "") // удаляем пробелы
+	number := make([]rune, 0)
 	for _, i := range example {
-		if unicode.IsDigit(i) {
-			list = append(list, string(i))
+		sign := string(i)
+		if unicode.IsDigit(i) { // проверяем является ли символ цифрой
+			number = append(number, i)  // добавляем в список для чисел
+			continue
+		} else {
+			if len(number) != 0 {
+				list = append(list, string(number)) // если это не цифра, то добавляем всю строку в список
+				number = make([]rune, 0)
+			}
 		}
 		for key, value := range OperatorPriority {
-			sign := string(i)
-			if key == sign {
+			if key == sign { // добавляем в стек знак операции, если стек пустой
 				if stack.IsEmptyStack() {
 					stack.Push(sign)
-					continue
+					break
 				}
-				if OperatorPriority[sign] > OperatorPriority[stack.Peek()] {
+				if value > OperatorPriority[stack.Peek()] { // если 
 					stack.Push(sign)
-					continue
+					break
 				}
-				if OperatorPriority[sign] == value {
+				if value == OperatorPriority[stack.Peek()] {
 					list = append(list, stack.Pop())
 					stack.Push(sign)
+					break
 				}
 			}
 		}
@@ -141,6 +150,10 @@ func (s *Example) Convert() (string, error) {
 
 
 func main() {
-	s := NewExample("3 + 4 * 2 / (1 - 5)")
-	fmt.Println(s.Convert())
+	// s := NewExample("3 + 4 * 2 / (1 - 5)")
+	// fmt.Println(s.Convert())
+	// s2 := NewExample("10 + 25 * (3 - 4)")
+	// fmt.Println(s2.Convert())
+	s3 := NewExample("10 + (25 * (3 - 4) + 5)")
+	fmt.Println(s3.Convert())
 }
