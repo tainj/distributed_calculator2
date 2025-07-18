@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: calculator-postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - calculator-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: calculator-kafka
+    ports:
+      - "9092:9092"  # Порт для клиентов
+      - "9093:9093"  # Порт для контроллера
+    environment:
+      KAFKA_ENABLE_KRAFT: true
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093  # Добавляем слушатель для контроллера
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER  # Указываем, что слушатель CONTROLLER используется для контроллера
+      CLUSTER_ID: my-cluster-id
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - calculator-network
+
+volumes:
+  postgres_data:
+  kafka_data:
+
+networks:
+  calculator-network:
+    driver: bridge

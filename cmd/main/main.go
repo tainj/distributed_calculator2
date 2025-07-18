@@ -9,20 +9,20 @@ import (
 )
 
 var (
-	ErrDivisionByZero       = errors.New("You can't divide by zero.")
-	ErrNonExistingOperation = errors.New("This operation does not exist or has not been implemented.")
-	ErrCovertExample        = errors.New("This line is not a mathematical expression or contains an error.")
+    ErrDivisionByZero       = errors.New("division by zero")
+    ErrNonExistingOperation = errors.New("operation does not exist or not implemented")
+    ErrCovertExample        = errors.New("line is not a mathematical expression or contains an error")
 )
 
 var (
 	OperatorPriority = map[string]int{
-		"(": 6,
 		"+": 1,
 		"-": 1,
 		"*": 2,
 		"/": 2,
 		"^": 3,
 		"~": 4,
+		"(": 6,
 	}
 )
 
@@ -73,10 +73,7 @@ func (s *Stack) Push(item string) {
 }
 
 func (s *Stack) IsEmptyStack() bool {
-	if len(s.list) == 0 {
-		return true
-	}
-	return false
+	return len(s.list) == 0
 }
 
 func (s *Stack) Pop() string {
@@ -111,6 +108,8 @@ func (s *Example) Convert() (string, error) {
 		if unicode.IsDigit(i) { // проверяем является ли символ цифрой
 			number = append(number, i) // добавляем в список для чисел
 			continue
+		} else if sign == "." {
+			number = append(number, rune(sign[0]))
 		} else {
 			if len(number) != 0 {
 				list = append(list, string(number)) // если это не цифра, то добавляем всю строку в список
@@ -126,9 +125,9 @@ func (s *Example) Convert() (string, error) {
 					break
 				}
 			}
-			stack.Push(sign) // Добавляем текущий оператор в стек
+			stack.Push(sign) // добавляем текущий оператор в стек
 		}
-		if i == ')' {
+		if i == ')' { // извлекаем операторы из стека 
 			for stack.Peek() != "(" {
 				list = append(list, stack.Pop())
 			}
@@ -144,11 +143,16 @@ func (s *Example) Convert() (string, error) {
 	return strings.Join(list, " "), nil
 }
 
+func (s *Example) Evaluate() {
+	data :=strings.Split(s.InfixExpr, " ")
+	
+}
+
 func main() {
 	// s := NewExample("3 + 4 * 2 / (1 - 5)")
 	// fmt.Println(s.Convert())
 	// s2 := NewExample("10 + 25 * (3 - 4)")
 	// fmt.Println(s2.Convert())
-	s3 := NewExample("100 + 25 * (3 - 4) + 5")
+	s3 := NewExample("10. + 9.6")
 	fmt.Println(s3.Convert())
 }
