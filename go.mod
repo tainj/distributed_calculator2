@@ -10,7 +10,6 @@ require (
 )
 
 require (
-	github.com/expr-lang/expr v1.17.5
 	github.com/golang/protobuf v1.5.3 // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
