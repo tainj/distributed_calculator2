@@ -40,10 +40,27 @@ services:
       - kafka_data:/var/lib/kafka/data
     networks:
       - calculator-network
+  
+  redis:
+    image: redis:7-alpine
+    container_name: calculator-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"  # Стандартный порт Redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - calculator-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
   kafka_data:
+  redis_data:
 
 networks:
   calculator-network:
