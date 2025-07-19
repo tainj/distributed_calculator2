@@ -30,3 +30,4 @@ func New(cfg Config) *CACHE {
 
 	return &CACHE{Client: client}
 }
+

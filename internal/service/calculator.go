@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
-	"log"
+
+	"github.com/google/uuid"
+	"github.com/tainj/distributed_calculator2/internal/models"
 	repo "github.com/tainj/distributed_calculator2/internal/repository"
+	"github.com/tainj/distributed_calculator2/pkg/calculator"
 )
 
 type CalculatorService struct {
@@ -14,17 +17,19 @@ func NewCalculatorService(repo repo.CalculatorRepository) *CalculatorService {
 	return &CalculatorService{repo: repo}
 }
 
-func (s *CalculatorService) Calculate(ctx context.Context, req *api.CalculationRequest) (*api.CalculationResponse, error) {
-	// Заглушка: просто возвращаем результат
-	log.Printf("Calculating expression: %s", req.Expression)
-	result := 42.0 // В реальности здесь будет вычисление
-
-	// Сохраняем результат в репозиторий
-	if err := s.repo.SaveResult(req.Expression, result); err != nil {
-	return nil, err
+func (s *CalculatorService) Calculate(ctx context.Context, example *models.Example) (*models.Example, error) {
+	expr := calculator.NewExample(example.Expression)  // создаем структуру
+	if !expr.Check() {
+		return nil, models.ErrCovertExample
 	}
-
-	return &api.CalculationResponse{
-	Result: &api.CalculationResponse_Value{Value: result},
-	}, nil
+	expr.Convert() // переводим в польскую нотацию
+	results, variable := expr.Calculate()
+	example = &models.Example{
+		Id: uuid.NewString(),
+		Expression: example.Expression,
+		SimpleExamples: results,
+		Response: variable,
+	}
+	s.repo.AddExpression(ctx, *example)
+	return example, nil
 }

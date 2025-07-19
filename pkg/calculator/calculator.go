@@ -121,7 +121,7 @@ func (s *Expression) Convert() (bool, error) {
 	return true, nil
 }
 
-func (s *Expression) Calculate() []MathExample {
+func (s *Expression) Calculate() ([]MathExample, string) {
 	results := make([]MathExample, 0)
 	expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
 	for len(expression) != 1 {
@@ -138,7 +138,7 @@ func (s *Expression) Calculate() []MathExample {
 			}
 		}
 	}
-	return results
+	return results, expression[0]
 }
 
 func replaceExpr(expr []string, opIndex int, varName string) []string {
