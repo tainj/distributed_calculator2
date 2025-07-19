@@ -3,9 +3,11 @@ module github.com/tainj/distributed_calculator2
 go 1.23.0
 
 require (
+	github.com/caarlos0/env/v8 v8.0.0
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/tantoni228/distributed_calculator2 v0.0.0-20240423041219-e8470e25fd80
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822

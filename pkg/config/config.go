@@ -1,12 +1,33 @@
 package config
 
 import (
+	"log"
 	"github.com/tainj/distributed_calculator2/pkg/db/cache"
 	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	"github.com/caarlos0/env/v8"
+    "github.com/joho/godotenv"
 )
 
 type Config struct {
-	postgres.Config
-	cache.RedisConfig
+	Postgres postgres.Config
+	Redis cache.RedisConfig
 }
 
+func LoadConfig() (*Config, error) {
+    // загружаем .env файл
+    if err := godotenv.Load(); err != nil {
+        log.Println("No .env file found, using environment variables")
+    }
+
+    cfg := &Config{}
+    
+    if err := env.Parse(&cfg.Postgres); err != nil {
+        return nil, err
+    }
+    
+    if err := env.Parse(&cfg.Redis); err != nil {
+        return nil, err
+    }
+    
+    return cfg, nil
+}

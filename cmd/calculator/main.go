@@ -1,6 +1,14 @@
 package main
 
+import (
+	"fmt"
+	"github.com/tainj/distributed_calculator2/pkg/config"
+)
+
 func main() {
-	example := "2 + 2"
-	NewExample
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(cfg.Redis.Host)
 }
