@@ -25,44 +25,19 @@ services:
     image: confluentinc/cp-kafka:latest
     container_name: calculator-kafka
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - "9092:9092"  # Порт для клиентов
+      - "9093:9093"  # Порт для контроллера
     environment:
       KAFKA_ENABLE_KRAFT: true
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093  # Добавляем слушатель для контроллера
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER  # Указываем, что слушатель CONTROLLER используется для контроллера
       CLUSTER_ID: my-cluster-id
     volumes:
       - kafka_data:/var/lib/kafka/data
-    networks:
-      - calculator-network
-
-  nginx:
-    image: nginx:alpine
-    container_name: calculator-nginx
-    ports:
-      - "80:80"  # Доступ на 80 порту (HTTP)
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf  # Подключаем конфиг Nginx
-    depends_on:
-      - app  # Зависит от Go-сервиса (app)
-    networks:
-      - calculator-network
-
-  app:  # Твой Go-сервис (Producer + Consumer)
-    build: .  # Собираем из Dockerfile
-    container_name: calculator-app
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "8080:8080"  # Внутренний порт Go-сервиса
-    depends_on:
-      - postgres
-      - kafka
     networks:
       - calculator-network
 
