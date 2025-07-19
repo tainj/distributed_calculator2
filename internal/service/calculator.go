@@ -6,14 +6,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/tainj/distributed_calculator2/internal/models"
 	repo "github.com/tainj/distributed_calculator2/internal/repository"
+	"github.com/tainj/distributed_calculator2/kafka"
 	"github.com/tainj/distributed_calculator2/pkg/calculator"
 )
 
 type CalculatorService struct {
-	repo repo.CalculatorRepository
+	repo *repo.CalculatorRepository
+	kafkaQueue  *kafka.KafkaQueue
 }
 
-func NewCalculatorService(repo repo.CalculatorRepository) *CalculatorService {
+func NewCalculatorService(repo *repo.CalculatorRepository) *CalculatorService {
 	return &CalculatorService{repo: repo}
 }
 
