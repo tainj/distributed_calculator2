@@ -2,8 +2,17 @@ syntax = "proto3";
 
 package calculator;
 
+option go_package = "github.com/tainj/distributed_calculator2/pkg/api"; // ДОБАВЬ ЭТО
+
+import "google/api/annotations.proto"; // Импортируем аннотации для HTTP
+
 service Calculator {
-  rpc Calculate(CalculationRequest) returns (CalculationResponse);
+  rpc Calculate(CalculationRequest) returns (CalculationResponse) {
+    option (google.api.http) = {
+      post: "/v1/calculate"  // HTTP POST запрос на /v1/calculate
+      body: "*"              // Тело запроса содержит JSON
+    };
+  }
 }
 
 message CalculationRequest {
