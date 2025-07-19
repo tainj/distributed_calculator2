@@ -3,8 +3,10 @@ module github.com/tainj/distributed_calculator2
 go 1.23.0
 
 require (
+	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/golang-jwt/jwt/v5 v5.2.3
+	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1

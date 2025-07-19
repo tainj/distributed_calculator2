@@ -10,7 +10,7 @@ import (
 
 type Config struct {
 	Postgres postgres.Config
-	Redis cache.RedisConfig
+	Redis cache.Config
 }
 
 func LoadConfig() (*Config, error) {

@@ -1,26 +1,26 @@
 package repository
 
-import "log"
+import (
+	"log"
 
-type CalculatorRepository interface {
-	SaveResult(expression string, result float64) error
-	GetResult(expression string) (float64, error)
+	"github.com/tainj/distributed_calculator2/pkg/db/cache"
+	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+)
+
+type CalculatorRepository struct {
+	db *postgres.DB
+	cache *cache.CACHE
 }
 
-type calculatorRepository struct {
+func NewCalculatorRepository(db *postgres.DB, cache *cache.CACHE) *CalculatorRepository {
+	return &CalculatorRepository{db: db, cache: cache}
 }
 
-func NewCalculatorRepository() CalculatorRepository {
-	return &calculatorRepository{}
-}
-
-func (r *calculatorRepository) SaveResult(expression string, result float64) error {
-	// Заглушка: просто логируем
+func (r *CalculatorRepository) SaveResult(expression string, result float64) error {
 	log.Printf("Saved result: %s = %v", expression, result)
 	return nil
 }
 
-func (r *calculatorRepository) GetResult(expression string) (float64, error) {
-	// Заглушка: возвращаем любое значение
+func (r *CalculatorRepository) GetResult(expression string) (float64, error) {
 	return 42, nil
 }

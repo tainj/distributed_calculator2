@@ -1,15 +1,10 @@
 package calculator
 
 import (
-	"errors"
 	"strings"
 	"unicode"
-)
-
-var (
-    ErrDivisionByZero       = errors.New("division by zero")
-    ErrNonExistingOperation = errors.New("operation does not exist or not implemented")
-    ErrCovertExample        = errors.New("line is not a mathematical expression or contains an error")
+	"github.com/Knetic/govaluate"
+	"github.com/google/uuid"
 )
 
 var (
@@ -23,6 +18,19 @@ var (
 		"(": 6,
 	}
 )
+
+type MathExample struct {
+	Num1 string
+	Num2 string
+	Sign string
+	Variable string
+}
+
+func NewMathExample(num1, num2, sign string) (MathExample, string) {
+	variable := uuid.New().String()
+	return MathExample{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
+}
+
 type Stack struct {
 	list []string
 }
@@ -59,6 +67,12 @@ type Expression struct {
 func NewExample(str string) *Expression {
 	return &Expression{Infix: str}
 }
+
+func (s *Expression) Check() bool {  // проверяется выражение на то, является ли оно корректным
+	_, err := govaluate.NewEvaluableExpression(s.Infix)
+	return err == nil
+}
+
 
 func (s *Expression) Convert() (bool, error) {
 	// инициализация списка, стека и списка для чисел
@@ -106,5 +120,49 @@ func (s *Expression) Convert() (bool, error) {
 	s.Postfix = strings.Join(list, " ")
 	return true, nil
 }
+
+func (s *Expression) Calculate() []MathExample {
+	results := make([]MathExample, 0)
+	expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
+	for len(expression) != 1 {
+		for index, sign := range expression {
+			if _, isOperator := OperatorPriority[sign]; isOperator {
+				example := expression[index - 2:index + 1]  // получаем два числа и оператор
+				num1 := example[0]
+				num2 := example[1]
+				sign := example[2]
+				result, variable := NewMathExample(num1, num2, sign)  // формируем пример
+				results = append(results, result)
+				expression = replaceExpr(expression, index, variable)
+				break
+			}
+		}
+	}
+	return results
+}
+
+func replaceExpr(expr []string, opIndex int, varName string) []string {
+    // определяем границы для вырезания
+    start := opIndex - 2
+    if start < 0 {
+        start = 0 // чтоб не уйти в минус
+    }
+
+    end := opIndex + 1
+    if end > len(expr) {
+        end = len(expr) // чтоб не выйти за пределы
+    }
+
+    // собираем новый слайс
+    newExpr := make([]string, 0, len(expr)-2)
+    newExpr = append(newExpr, expr[:start]...) // всё до оператора
+    newExpr = append(newExpr, varName)         // наша переменная
+    newExpr = append(newExpr, expr[end:]...)   // всё после оператора
+
+    return newExpr
+}
+
+
+
 
 

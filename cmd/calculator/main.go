@@ -10,5 +10,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(cfg.Redis.Host)
+	fmt.Println(cfg)
+
+	
 }
