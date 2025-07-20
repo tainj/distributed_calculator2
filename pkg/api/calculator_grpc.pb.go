@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Calculator_Calculate_FullMethodName = "/calculator.Calculator/Calculate"
+	Calculator_GetResult_FullMethodName = "/calculator.Calculator/GetResult"
 )
 
 // CalculatorClient is the client API for Calculator service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CalculatorClient interface {
 	Calculate(ctx context.Context, in *CalculationRequest, opts ...grpc.CallOption) (*CalculationResponse, error)
+	GetResult(ctx context.Context, in *GetResultRequest, opts ...grpc.CallOption) (*GetResultResponse, error)
 }
 
 type calculatorClient struct {
@@ -47,11 +49,22 @@ func (c *calculatorClient) Calculate(ctx context.Context, in *CalculationRequest
 	return out, nil
 }
 
+func (c *calculatorClient) GetResult(ctx context.Context, in *GetResultRequest, opts ...grpc.CallOption) (*GetResultResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetResultResponse)
+	err := c.cc.Invoke(ctx, Calculator_GetResult_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CalculatorServer is the server API for Calculator service.
 // All implementations must embed UnimplementedCalculatorServer
 // for forward compatibility.
 type CalculatorServer interface {
 	Calculate(context.Context, *CalculationRequest) (*CalculationResponse, error)
+	GetResult(context.Context, *GetResultRequest) (*GetResultResponse, error)
 	mustEmbedUnimplementedCalculatorServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedCalculatorServer struct{}
 
 func (UnimplementedCalculatorServer) Calculate(context.Context, *CalculationRequest) (*CalculationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Calculate not implemented")
+}
+func (UnimplementedCalculatorServer) GetResult(context.Context, *GetResultRequest) (*GetResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetResult not implemented")
 }
 func (UnimplementedCalculatorServer) mustEmbedUnimplementedCalculatorServer() {}
 func (UnimplementedCalculatorServer) testEmbeddedByValue()                    {}
@@ -104,6 +120,24 @@ func _Calculator_Calculate_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Calculator_GetResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CalculatorServer).GetResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Calculator_GetResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CalculatorServer).GetResult(ctx, req.(*GetResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Calculator_ServiceDesc is the grpc.ServiceDesc for Calculator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var Calculator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Calculate",
 			Handler:    _Calculator_Calculate_Handler,
+		},
+		{
+			MethodName: "GetResult",
+			Handler:    _Calculator_GetResult_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

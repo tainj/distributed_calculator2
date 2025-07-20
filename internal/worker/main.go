@@ -3,8 +3,8 @@ package worker
 
 import (
   "encoding/json"
-  "github.com/Anton6896/distributed_calculator2/internal/repository"
-  "github.com/Anton6896/distributed_calculator2/kafka"
+  // "github.com/Anton6896/distributed_calculator2/internal/repository"
+  // "github.com/Anton6896/distributed_calculator2/kafka"
 )
 
 type Worker struct {
