@@ -8,9 +8,15 @@ import (
     "github.com/joho/godotenv"
 )
 
+type GRPCServer struct {
+    RestPort int   `env:"GRPC_REST_SERVER_PORT" env-default:"8080"`
+    GRPCPort int   `env:"GRPC_SERVER_PORT" env-default:"50051"`
+}
+
 type Config struct {
 	Postgres postgres.Config
 	Redis cache.Config
+    Grpc  GRPCServer
 }
 
 func LoadConfig() (*Config, error) {
@@ -26,6 +32,10 @@ func LoadConfig() (*Config, error) {
     }
     
     if err := env.Parse(&cfg.Redis); err != nil {
+        return nil, err
+    }
+
+    if err := env.Parse(&cfg.Grpc); err != nil {
         return nil, err
     }
     
