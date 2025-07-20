@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/tainj/distributed_calculator2/internal/models"
@@ -32,6 +33,12 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
 		SimpleExamples: results,
 		Response: variable,
 	}
-	s.repo.AddExpression(ctx, *example)
+
+	for _, task := range results {
+		err := s.kafkaQueue.SendTask(task)
+		return nil, fmt.Errorf("send message kafka: %w", err)
+	}
+
+	s.repo.Cache.AddExpression(ctx, *example)
 	return example, nil
 }

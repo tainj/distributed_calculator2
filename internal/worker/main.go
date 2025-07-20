@@ -1,50 +1,52 @@
-// worker/worker.go
 package worker
 
 import (
-  "encoding/json"
-  // "github.com/Anton6896/distributed_calculator2/internal/repository"
-  // "github.com/Anton6896/distributed_calculator2/kafka"
+    "encoding/json"
+    repo "github.com/tainj/distributed_calculator2/internal/repository"
+    "github.com/tainj/distributed_calculator2/kafka"
 )
 
 type Worker struct {
-  repo       *repository.CCalculatorRepository
-  kafkaQueue *kafka.KafkaQueue
+    repo       *repo.CalculatorRepository
+    kafkaQueue *kafka.KafkaQueue
 }
 
-func NewWorker(repo *repository.CCalculatorRepository, kafkaQueue *kafka.KafkaQueue) *Worker {
-  return &Worker{repo: repo, kafkaQueue: kafkaQueue}
+func NewWorker(repo *repo.CalculatorRepository, kafkaQueue *kafka.KafkaQueue) *Worker {
+    return &Worker{repo: repo, kafkaQueue: kafkaQueue}
 }
 
 type Task struct {
-  Expression string `json:"expression"`
+    Num1 string `json:"num1"`
+    Num2 string `json:"num2"`
+    Sign string `json:"sign"`
+    Variable string `json:"variable"`
 }
 
 func (w *Worker) Start() {
-  for {
-    // Читаем задачу из Kafka
-    jsonData, err := w.kafkaQueue.ReadTask()
-    if err != nil {
-      continue
-    }
+    for {
+        // Читаем задачу из Kafka
+        jsonData, err := w.kafkaQueue.ReadTask()
+        if err != nil {
+            continue
+        }
 
-    // Десериализуем JSON
-    var task Task
-    if err := json.Unmarshal(jsonData, &task); err != nil {
-      continue
-    }
+        // Десериализуем JSON
+        var task Task
+        if err := json.Unmarshal(jsonData, &task); err != nil {
+            continue
+        }
 
-    // Вычисли результат
-    result := evaluateExpression(task.Expression)
+        // Вычисли результат
+        result := evaluateExpression(task.Expression)
 
-    // Сохраняем результат в Redis
-    if err := w.repo.SaveResult(task.Expression, result); err != nil {
-      continue
+        // Сохраняем результат в Redis
+        if err := w.repo.SaveResult(task.Expression, result); err != nil {
+            continue
+        }
     }
-  }
 }
 
 func evaluateExpression(expression string) string {
-  // Логика вычисления (пока заглушка)
-  return "42"
+    // Логика вычисления (пока заглушка)
+    return "42"
 }

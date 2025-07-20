@@ -1,8 +1,12 @@
 package calculator
 
 import (
+	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
+
 	"github.com/Knetic/govaluate"
 	"github.com/google/uuid"
 )
@@ -29,6 +33,50 @@ type MathExample struct {
 func NewMathExample(num1, num2, sign string) (MathExample, string) {
 	variable := uuid.New().String()
 	return MathExample{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
+}
+
+func (m *MathExample) Calculate(getVariable func(string) (float64, error)) (float64, error) {
+    // Функция для получения значения числа или переменной
+    getValue := func(input string) (float64, error) {
+        if isNumber(input) {
+            return strconv.ParseFloat(input, 64)
+        }
+        return getVariable(input)
+    }
+
+    // Получаем значения Num1 и Num2
+    num1, err := getValue(m.Num1)
+    if err != nil {
+        return 0, fmt.Errorf("failed to get Num1: %w", err)
+    }
+
+    num2, err := getValue(m.Num2)
+    if err != nil {
+        return 0, fmt.Errorf("failed to get Num2: %w", err)
+    }
+
+    // Выполняем операцию
+    switch m.Sign {
+    case "+":
+        return num1 + num2, nil
+    case "-":
+        return num1 - num2, nil
+    case "*":
+        return num1 * num2, nil
+    case "/":
+        if num2 == 0 {
+            return 0, errors.New("division by zero")
+        }
+        return num1 / num2, nil
+    default:
+        return 0, fmt.Errorf("unknown sign: %s", m.Sign)
+    }
+}
+
+// Функция для проверки, является ли строка числом
+func isNumber(s string) bool {
+    _, err := strconv.ParseFloat(s, 64)
+    return err == nil
 }
 
 type Stack struct {
