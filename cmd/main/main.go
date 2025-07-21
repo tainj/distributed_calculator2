@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/tainj/distributed_calculator2/pkg/config"
-	repo "github.com/tainj/distributed_calculator2/internal/repository"
-	service "github.com/tainj/distributed_calculator2/internal/service"
-	"github.com/tainj/distributed_calculator2/internal/transport/grpc"
-	"github.com/tainj/distributed_calculator2/pkg/db/cache"
-	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
-	"github.com/tainj/distributed_calculator2/pkg/logger"
 	"os"
 	"os/signal"
 	"syscall"
+
+	repo "github.com/tainj/distributed_calculator2/internal/repository"
+	service "github.com/tainj/distributed_calculator2/internal/service"
+	"github.com/tainj/distributed_calculator2/internal/transport/grpc"
+	"github.com/tainj/distributed_calculator2/internal/worker"
+	"github.com/tainj/distributed_calculator2/kafka"
+	"github.com/tainj/distributed_calculator2/pkg/config"
+	"github.com/tainj/distributed_calculator2/pkg/db/cache"
+	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
 )
 
 const (
@@ -42,9 +45,22 @@ func main() {
 	redis := cache.New(cfg.Redis)
 	fmt.Println(redis.Client.Ping(ctx))
 
-	repo := repo.NewCalculatorRepository(db, redis)
+	// Инициализация Kafka
+	kafkaQueue, err := kafka.NewKafkaQueue(cfg.Kafka)
+	if err != nil {
+		mainLogger.Error(ctx, "Failed to init Kafka: "+err.Error())
+		panic(err)
+	}
 
+
+	// Создаем репозиторий и сервис
+	repo := repo.NewCalculatorRepository(db, redis)
 	srv := service.NewCalculatorService(repo)
+
+	// Создаем и запускаем воркер
+	worker := worker.NewWorker(repo, kafkaQueue)
+	go worker.Start() // Запускаем воркер в отдельной горутине
+
 
 	grpcserver, err := grpc.New(ctx, cfg.Grpc.GRPCPort, cfg.Grpc.RestPort, srv)
 	if err != nil {

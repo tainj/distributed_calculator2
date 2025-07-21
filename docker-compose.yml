@@ -23,24 +23,67 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:latest
-    container_name: calculator-kafka
+    container_name: calculator-kafka-1
+    hostname: kafka-1
     ports:
-      - "9092:9092"  # Порт для клиентов
-      - "9093:9093"  # Порт для контроллера
+      - "9092:9092"  # Внешний порт 9092 -> внутренний порт 9092
+      - "9093:9093"  # Для контроллера
     environment:
       KAFKA_ENABLE_KRAFT: true
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093  # Добавляем слушатель для контроллера
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER  # Указываем, что слушатель CONTROLLER используется для контроллера
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       CLUSTER_ID: my-cluster-id
     volumes:
-      - kafka_data:/var/lib/kafka/data
+      - kafka_data_1:/var/lib/kafka/data
     networks:
       - calculator-network
-  
+
+  kafka-2:
+    image: confluentinc/cp-kafka:latest
+    container_name: calculator-kafka-2
+    hostname: kafka-2
+    ports:
+      - "9094:9094"  # Внешний порт 9094 -> внутренний порт 9094
+      - "9095:9093"  # Для контроллера
+    environment:
+      KAFKA_ENABLE_KRAFT: true
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 2
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      CLUSTER_ID: my-cluster-id
+    volumes:
+      - kafka_data_2:/var/lib/kafka/data
+    networks:
+      - calculator-network
+
+  kafka-3:
+    image: confluentinc/cp-kafka:latest
+    container_name: calculator-kafka-3
+    hostname: kafka-3
+    ports:
+      - "9096:9096"  # Внешний порт 9096 -> внутренний порт 9096
+      - "9097:9093"  # Для контроллера
+    environment:
+      KAFKA_ENABLE_KRAFT: true
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 3
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9096,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9096
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      CLUSTER_ID: my-cluster-id
+    volumes:
+      - kafka_data_3:/var/lib/kafka/data
+    networks:
+      - calculator-network
+
   redis:
     image: redis:7-alpine
     container_name: calculator-redis
@@ -59,7 +102,9 @@ services:
 
 volumes:
   postgres_data:
-  kafka_data:
+  kafka_data_1:
+  kafka_data_2:
+  kafka_data_3:
   redis_data:
 
 networks:

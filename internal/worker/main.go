@@ -1,9 +1,14 @@
 package worker
 
 import (
-    "encoding/json"
-    repo "github.com/tainj/distributed_calculator2/internal/repository"
-    "github.com/tainj/distributed_calculator2/kafka"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+
+	repo "github.com/tainj/distributed_calculator2/internal/repository"
+	"github.com/tainj/distributed_calculator2/kafka"
+	"github.com/tainj/distributed_calculator2/pkg/calculator"
 )
 
 type Worker struct {
@@ -15,38 +20,44 @@ func NewWorker(repo *repo.CalculatorRepository, kafkaQueue *kafka.KafkaQueue) *W
     return &Worker{repo: repo, kafkaQueue: kafkaQueue}
 }
 
-type Task struct {
-    Num1 string `json:"num1"`
-    Num2 string `json:"num2"`
-    Sign string `json:"sign"`
-    Variable string `json:"variable"`
-}
-
 func (w *Worker) Start() {
-    for {
-        // Читаем задачу из Kafka
-        jsonData, err := w.kafkaQueue.ReadTask()
-        if err != nil {
-            continue
-        }
+	for {
+		// Читаем задачу из Kafka
+		jsonData, message, err := w.kafkaQueue.ReadTask()
+		if err != nil {
+			log.Printf("Failed to read task from Kafka: %v\n", err)
+			continue
+		}
 
-        // Десериализуем JSON
-        var task Task
-        if err := json.Unmarshal(jsonData, &task); err != nil {
-            continue
-        }
+		// Десериализуем JSON
+		var task calculator.MathExample
+		if err := json.Unmarshal(jsonData, &task); err != nil {
+			log.Printf("Failed to unmarshal task: %v\n", err)
+			continue
+		}
 
-        // Вычисли результат
-        result := evaluateExpression(task.Expression)
+		// Вычисляем результат
+		result, err := task.Calculate(w.repo.Cache)
+		if err != nil {
+			log.Printf("Failed to calculate task: %v\n", err)
+			continue
+		}
 
-        // Сохраняем результат в Redis
-        if err := w.repo.SaveResult(task.Expression, result); err != nil {
-            continue
-        }
-    }
-}
+		// Создаём контекст
+		ctx := context.Background()
 
-func evaluateExpression(expression string) string {
-    // Логика вычисления (пока заглушка)
-    return "42"
+		// Сохраняем результат в Redis
+		if err := w.repo.Cache.SetByKey(ctx, fmt.Sprintf("user:1:variable:%s", task.Variable), result); err != nil {
+			log.Printf("Failed to save result to Redis: %v\n", err)
+			continue
+		}
+
+		// Подтверждаем обработку сообщения
+		if err := w.kafkaQueue.Commit(message); err != nil {
+			log.Printf("Failed to commit message: %v\n", err)
+			continue
+		}
+
+		log.Printf("Task processed successfully. Variable: %s, Result: %s\n", task.Variable, result)
+	}
 }

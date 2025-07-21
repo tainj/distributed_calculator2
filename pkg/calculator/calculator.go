@@ -1,6 +1,7 @@
 package calculator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -24,10 +25,10 @@ var (
 )
 
 type MathExample struct {
-	Num1 string
-	Num2 string
-	Sign string
-	Variable string
+    Num1     string `json:"num1"`
+    Num2     string `json:"num2"`
+    Sign     string `json:"sign"`
+    Variable string `json:"variable"`
 }
 
 func NewMathExample(num1, num2, sign string) (MathExample, string) {
@@ -35,13 +36,27 @@ func NewMathExample(num1, num2, sign string) (MathExample, string) {
 	return MathExample{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
 }
 
-func (m *MathExample) Calculate(getVariable func(string) (float64, error)) (float64, error) {
+type RedisStore interface {
+    GetByKey(ctx context.Context, key string, dest interface{}) error
+    SetByKey(ctx context.Context, key string, value interface{}) error
+}
+
+func (m *MathExample) Calculate(cache RedisStore) (float64, error) {
     // Функция для получения значения числа или переменной
     getValue := func(input string) (float64, error) {
+        // Если input — число, переводим его в float64
         if isNumber(input) {
             return strconv.ParseFloat(input, 64)
         }
-        return getVariable(input)
+
+        // Если input — UUID, пытаемся получить значение из Redis
+        key := formatKey(input)
+        var value float64
+        err := cache.GetByKey(context.Background(), key, &value)
+        if err != nil {
+            return 0, fmt.Errorf("failed to get variable %s from Redis: %w", input, err)
+        }
+        return value, nil
     }
 
     // Получаем значения Num1 и Num2
@@ -73,10 +88,14 @@ func (m *MathExample) Calculate(getVariable func(string) (float64, error)) (floa
     }
 }
 
-// Функция для проверки, является ли строка числом
-func isNumber(s string) bool {
+
+func isNumber(s string) bool {  // функция для проверки, является ли строка числом
     _, err := strconv.ParseFloat(s, 64)
     return err == nil
+}
+
+func formatKey(variable string) string {
+	return fmt.Sprintf("user:1:variable:%s", variable)
 }
 
 type Stack struct {
