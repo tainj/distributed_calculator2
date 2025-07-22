@@ -1,15 +1,13 @@
 package calculator
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 
 	"github.com/Knetic/govaluate"
 	"github.com/google/uuid"
+	"github.com/tainj/distributed_calculator2/internal/models"
 )
 
 var (
@@ -24,80 +22,12 @@ var (
 	}
 )
 
-type MathExample struct {
-    Num1     string `json:"num1"`
-    Num2     string `json:"num2"`
-    Sign     string `json:"sign"`
-    Variable string `json:"variable"`
+func NewExample(num1, num2, sign string) (models.Task, string) {
+	variable := uuid.New().String()  // генерируем имя переменной, куда будет сохранен результат
+	return models.Task{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
 }
 
-func NewMathExample(num1, num2, sign string) (MathExample, string) {
-	variable := uuid.New().String()
-	return MathExample{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
-}
-
-type RedisStore interface {
-    GetByKey(ctx context.Context, key string, dest interface{}) error
-    SetByKey(ctx context.Context, key string, value interface{}) error
-}
-
-func (m *MathExample) Calculate(cache RedisStore) (float64, error) {
-    // Функция для получения значения числа или переменной
-    getValue := func(input string) (float64, error) {
-        // Если input — число, переводим его в float64
-        if isNumber(input) {
-            return strconv.ParseFloat(input, 64)
-        }
-
-        // Если input — UUID, пытаемся получить значение из Redis
-        key := formatKey(input)
-        var value float64
-        err := cache.GetByKey(context.Background(), key, &value)
-        if err != nil {
-            return 0, fmt.Errorf("failed to get variable %s from Redis: %w", input, err)
-        }
-        return value, nil
-    }
-
-    // Получаем значения Num1 и Num2
-    num1, err := getValue(m.Num1)
-    if err != nil {
-        return 0, fmt.Errorf("failed to get Num1: %w", err)
-    }
-
-    num2, err := getValue(m.Num2)
-    if err != nil {
-        return 0, fmt.Errorf("failed to get Num2: %w", err)
-    }
-
-    // Выполняем операцию
-    switch m.Sign {
-    case "+":
-        return num1 + num2, nil
-    case "-":
-        return num1 - num2, nil
-    case "*":
-        return num1 * num2, nil
-    case "/":
-        if num2 == 0 {
-            return 0, errors.New("division by zero")
-        }
-        return num1 / num2, nil
-    default:
-        return 0, fmt.Errorf("unknown sign: %s", m.Sign)
-    }
-}
-
-
-func isNumber(s string) bool {  // функция для проверки, является ли строка числом
-    _, err := strconv.ParseFloat(s, 64)
-    return err == nil
-}
-
-func formatKey(variable string) string {
-	return fmt.Sprintf("user:1:variable:%s", variable)
-}
-
+// реализация стека и его методов
 type Stack struct {
 	list []string
 }
@@ -131,7 +61,7 @@ type Expression struct {
     Postfix string // постфиксное выражение
 }
 
-func NewExample(str string) *Expression {
+func NewExpression(str string) *Expression {
 	return &Expression{Infix: str}
 }
 
@@ -140,8 +70,10 @@ func (s *Expression) Check() bool {  // проверяется выражени�
 	return err == nil
 }
 
-
 func (s *Expression) Convert() (bool, error) {
+	if !s.Check() {
+		return false, fmt.Errorf("line is not a mathematical expression or contains an error")
+	}
 	// инициализация списка, стека и списка для чисел
 	list := make([]string, 0)
 	stack := NewStack()
@@ -188,8 +120,8 @@ func (s *Expression) Convert() (bool, error) {
 	return true, nil
 }
 
-func (s *Expression) Calculate() ([]MathExample, string) {
-	results := make([]MathExample, 0)
+func (s *Expression) Calculate() ([]models.Task, string) {
+	results := make([]models.Task, 0)
 	expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
 	for len(expression) != 1 {
 		for index, sign := range expression {
@@ -198,7 +130,7 @@ func (s *Expression) Calculate() ([]MathExample, string) {
 				num1 := example[0]
 				num2 := example[1]
 				sign := example[2]
-				result, variable := NewMathExample(num1, num2, sign)  // формируем пример
+				result, variable := NewExample(num1, num2, sign)  // формируем пример
 				results = append(results, result)
 				expression = replaceExpr(expression, index, variable)
 				break
@@ -228,8 +160,4 @@ func replaceExpr(expr []string, opIndex int, varName string) []string {
 
     return newExpr
 }
-
-
-
-
 

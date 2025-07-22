@@ -2,10 +2,9 @@ package config
 
 import (
 	"log"
-
 	"github.com/caarlos0/env/v8"
 	"github.com/joho/godotenv"
-	"github.com/tainj/distributed_calculator2/kafka"
+	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 	"github.com/tainj/distributed_calculator2/pkg/db/cache"
 	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
 )
