@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -52,10 +53,13 @@ func main() {
 		panic(err)
 	}
 
+	if kafkaQueue == nil {
+		panic(errors.New("KafkaQueue is not initialized"))
+	}
 
 	// Создаем репозиторий и сервис
 	repo := repo.NewCalculatorRepository(db, redis)
-	srv := service.NewCalculatorService(repo)
+	srv := service.NewCalculatorService(repo, kafkaQueue)
 
 	// Создаем и запускаем воркер
 	worker := worker.NewWorker(repo, kafkaQueue)

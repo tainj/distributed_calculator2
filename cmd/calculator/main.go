@@ -10,6 +10,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(cfg.Grpc.RestPort)
+	fmt.Println(cfg.Kafka)
 
 }

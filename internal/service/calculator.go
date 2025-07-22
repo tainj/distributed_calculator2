@@ -16,8 +16,8 @@ type CalculatorService struct {
 	kafkaQueue  *kafka.KafkaQueue
 }
 
-func NewCalculatorService(repo *repo.CalculatorRepository) *CalculatorService {
-	return &CalculatorService{repo: repo}
+func NewCalculatorService(repo *repo.CalculatorRepository, kafkaQueue *kafka.KafkaQueue) *CalculatorService {
+	return &CalculatorService{repo: repo, kafkaQueue: kafkaQueue}
 }
 
 func (s *CalculatorService) Calculate(ctx context.Context, example *models.Example) (*models.Example, error) {

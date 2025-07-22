@@ -16,55 +16,46 @@ type KafkaQueue struct {
 }
 
 type Config struct {
-    BootstrapServers   string `env:"KAFKA_BOOTSTRAP_SERVERS" env-default:"localhost:9092"`
-    TopicCalculations  string `env:"KAFKA_TOPIC_CALCULATIONS" env-default:"calculator_tasks"`
-    TopicResults       string `env:"KAFKA_TOPIC_RESULTS" env-default:"calculator_results"`
+    BootstrapServers string `env:"KAFKA_BOOTSTRAP_SERVERS" env-default:"localhost:9092,localhost:9094,localhost:9096"`
+    TopicCalculations string `env:"KAFKA_TOPIC_CALCULATIONS" env-default:"calculator_tasks"`
+    TopicResults string `env:"KAFKA_TOPIC_RESULTS" env-default:"calculator_results"`
 }
 
-func NewKafkaQueue(cfg KafkaConfig) (*KafkaQueue, error) {
-    // Разделяем строку на массив брокеров
+func NewKafkaQueue(cfg Config) (*KafkaQueue, error) {
     brokers := strings.Split(cfg.BootstrapServers, ",")
-    tasksTopic := cfg.TopicCalculations
-
-    log.Printf("Initializing KafkaQueue with brokers: %v, topic: %s\n", brokers, tasksTopic)
-
-    // Проверяем, что брокеры указаны
+    log.Printf("Initializing KafkaQueue with brokers: %v, topic: %s\n", brokers, cfg.TopicCalculations)
     if len(brokers) == 0 {
         return nil, fmt.Errorf("no Kafka brokers specified")
     }
-
     return &KafkaQueue{
         writer: &kafka.Writer{
             Addr:  kafka.TCP(brokers...),
-            Topic: tasksTopic,
+            Topic: cfg.TopicCalculations,
         },
         reader: kafka.NewReader(kafka.ReaderConfig{
             Brokers: brokers,
-            Topic:   tasksTopic,
-            GroupID: "calculator_group", // Группа потребителей
+            Topic:   cfg.TopicCalculations,
+            GroupID: "calculator_group",
         }),
     }, nil
 }
 
 func (k *KafkaQueue) SendTask(task interface{}) error {
-	jsonData, err := json.Marshal(task)
-	if err != nil {
-		log.Printf("Failed to marshal task: %v\n", err)
-		return err
-	}
-
-	log.Printf("Sending task to Kafka: %s\n", string(jsonData))
-
-	err = k.writer.WriteMessages(context.Background(), kafka.Message{
-		Value: jsonData,
-	})
-	if err != nil {
-		log.Printf("Failed to send task to Kafka: %v\n", err)
-		return err
-	}
-
-	log.Println("Task sent successfully")
-	return nil
+    jsonData, err := json.Marshal(task)
+    if err != nil {
+        log.Printf("Failed to marshal task: %v\n", err)
+        return err
+    }
+    log.Printf("Sending task to Kafka: %s\n", string(jsonData))
+    err = k.writer.WriteMessages(context.Background(), kafka.Message{
+        Value: jsonData,
+    })
+    if err != nil {
+        log.Printf("Failed to send task to Kafka: %v\n", err)
+        return err
+    }
+    log.Println("Task sent successfully")
+    return nil
 }
 
 // ReadTask возвращает данные сообщения и само сообщение для commit
