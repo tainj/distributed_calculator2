@@ -40,6 +40,5 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
     	}
 	}
 
-	s.repo.AddExpression(ctx, *example)
 	return example, nil
 }
