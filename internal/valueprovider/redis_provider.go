@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+
+	"github.com/redis/go-redis/v9"
 	"github.com/tainj/distributed_calculator2/pkg/db/cache"
 )
 
@@ -29,6 +31,9 @@ func (r *RedisValueProvider) Resolve(ctx context.Context, ref string) (float64, 
     key := "result:" + ref
     var result float64
     if err := r.cache.GetByKey(ctx, key, &result); err != nil {
+         if err == redis.Nil {
+            return 0, fmt.Errorf("variable %s not ready yet", ref) // ← не фатально, но ошибка
+        }
         return 0, fmt.Errorf("failed to resolve variable %s: %w", ref, err)
     }
 

@@ -42,9 +42,9 @@ func (w *Worker) Start() {
 			continue
 		}
 
-		err = w.ProcessTask(ctx, task)
-		if err := w.kafkaQueue.Commit(message); err != nil {
-			log.Printf("Failed to commit message: %v\n", err)
+		// обрабатываем и сохраняем сообщение
+		if err := w.ProcessTask(ctx, task); err != nil {
+			log.Printf("Failed to parse message: %v\n", err)
 			continue
 		}
 

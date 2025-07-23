@@ -41,7 +41,7 @@ func (s *RedisResultRepository) GetExpressions(ctx context.Context) ([]models.Ex
 
 func (s *RedisResultRepository) AddExpression(ctx context.Context, expr models.Example) error {
 	// получаем существующие
-	key := "user:1:expressions"
+	key := fmt.Sprintf("result:%s", expr.Response)
 	expressions, err := s.GetExpressions(ctx)
 	if err != nil {
 		return err
@@ -70,5 +70,5 @@ func (s *RedisResultRepository) SaveExpressions(ctx context.Context, key string,
 }
 
 func (r *RedisResultRepository) SaveResult(ctx context.Context, variable string, result float64) error {
-    return r.cache.SetByKey(ctx, fmt.Sprintf("user:1:variable:%s", variable), result)
+    return r.cache.SetByKey(ctx, fmt.Sprintf("result:%s", variable), result)
 }

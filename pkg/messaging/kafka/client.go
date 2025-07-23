@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-
 	"github.com/segmentio/kafka-go"
 )
 
@@ -39,9 +38,12 @@ func NewKafkaQueue(cfg Config) (*KafkaQueue, error) {
 			Topic: cfg.TopicCalculations,
 		},
 		reader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers: brokers,
-			Topic:   cfg.TopicCalculations,
-			GroupID: "calculator_group",
+			Brokers:        brokers,
+			Topic:          cfg.TopicCalculations,
+			GroupID:        "calculator_group",
+			MinBytes:       1,
+			MaxBytes:       1e6,
+			CommitInterval: 0,               // коммитим вручную
 		}),
 	}, nil
 }
