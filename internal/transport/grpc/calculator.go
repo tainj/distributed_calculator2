@@ -10,6 +10,7 @@ import (
 
 type Service interface {
 	Calculate(ctx context.Context, example *models.Example) (*models.Example, error)
+	GetResult(ctx context.Context, exampleID string) (float64, error)
 }
 
 type CalculatorService struct {
@@ -30,6 +31,28 @@ func (s *CalculatorService) Calculate(ctx context.Context, req *client.Calculati
 	}
 	r := pointer.Get(resp)
 	return &client.CalculationResponse{
-		TaskId: r.Response,
+		TaskId: r.Id,
 	}, nil
+}
+
+// transport/grpc/calculator.go
+func (s *CalculatorService) GetResult(ctx context.Context, req *client.GetResultRequest) (*client.GetResultResponse, error) {
+    taskID := req.GetTaskId()
+
+    // Получаем из бизнес-логики
+    result, err := s.service.GetResult(ctx, taskID)
+    if err != nil {
+        return &client.GetResultResponse{
+            Result: &client.GetResultResponse_Error{
+                Error: err.Error(),
+            },
+        }, nil // ❗ не возвращаем ошибку в gRPC sense, а кладём в oneof
+    }
+
+    // Успешно — возвращаем значение
+    return &client.GetResultResponse{
+        Result: &client.GetResultResponse_Value{
+            Value: result, // *float64 → float64
+        },
+    }, nil
 }

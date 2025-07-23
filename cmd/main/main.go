@@ -60,10 +60,10 @@ func main() {
 
 	// Создаем репозиторий и сервис
 	repo := repo.NewRedisResultRepository(redis)
-	srv := service.NewCalculatorService(repo, kafkaQueue, repoExample)
+	srv := service.NewCalculatorService(kafkaQueue, repoExample)
 
 	// Создаем и запускаем воркер
-	worker := worker.NewWorker(repo, kafkaQueue, valueProvider)
+	worker := worker.NewWorker(repoExample, repo, kafkaQueue, valueProvider)
 	go worker.Start() // Запускаем воркер в отдельной горутине
 
 

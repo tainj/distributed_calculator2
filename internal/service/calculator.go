@@ -12,13 +12,12 @@ import (
 )
 
 type CalculatorService struct {
-	repo repo.RedisResultRepository
 	repoExamples repo.ExampleRepository
 	kafkaQueue kafka.TaskQueue
 }
 
-func NewCalculatorService(repo *repo.RedisResultRepository, kafkaQueue *kafka.KafkaQueue, repoExample *repo.PostgresResultRepository) *CalculatorService {
-	return &CalculatorService{repo: *repo, kafkaQueue: kafkaQueue, repoExamples: repoExample}
+func NewCalculatorService(kafkaQueue *kafka.KafkaQueue, repoExample *repo.PostgresResultRepository) *CalculatorService {
+	return &CalculatorService{kafkaQueue: kafkaQueue, repoExamples: repoExample}
 }
 
 func (s *CalculatorService) Calculate(ctx context.Context, example *models.Example) (*models.Example, error) {
@@ -26,25 +25,45 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
 	if !expr.Check() {
 		return nil, models.ErrCovertExample
 	}
-	expr.Convert() // переводим в польскую нотацию
+	if _, err := expr.Convert(); err != nil {  // переводим в польскую нотацию 
+        return nil, err
+    }
+
+	// генерируем ID примера
+    exampleID := uuid.New().String()
+
 	results, variable := expr.Calculate()
-	example = &models.Example{
-		Id: uuid.NewString(),
+
+	example = &models.Example{ // формируем пример для сохранения
+		Id: exampleID,
 		Expression: example.Expression,
 		SimpleExamples: results,
 		Response: variable,
 	}
 
-	err := s.repoExamples.SaveExample(ctx, example)
+	err := s.repoExamples.SaveExample(ctx, example) // сохраняем
 	if err != nil {
 		return nil, fmt.Errorf("Calculate: save example: %v", err)
 	}
 
-	for _, task := range results {
-		if err := s.kafkaQueue.SendTask(task); err != nil {
-        	return nil, fmt.Errorf("Calculate: send message kafka: %v", err)
-    	}
-	}
+	for i, task := range results { // отправляем по очереди таски
+		kafkaTask := &models.Task{
+            Num1:      task.Num1,
+            Num2:      task.Num2,
+            Sign:      task.Sign,
+            Variable:  task.Variable,
+            ExampleID: exampleID,        // привязка к Example
+            Index:     i,                // порядок
+            IsFinal:   task.Variable == variable, // это финальный результат?
+        }
 
+        if err := s.kafkaQueue.SendTask(kafkaTask); err != nil {
+            return nil, fmt.Errorf("failed to send task to kafka: %w", err)
+        }
+	}
 	return example, nil
+}
+
+func (s *CalculatorService) GetResult(ctx context.Context, exampleID string) (float64, error) {
+	return s.repoExamples.GetResult(ctx, exampleID)
 }

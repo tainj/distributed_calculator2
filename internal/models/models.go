@@ -11,10 +11,13 @@ type Example struct {
 }
 
 type Task struct {
-    Num1     string `json:"num1"`
-    Num2     string `json:"num2"`
-    Sign     string `json:"sign"`
-    Variable string `json:"variable"`
+    Num1      string  `json:"num1"`
+    Num2      string  `json:"num2"`
+    Sign      string  `json:"sign"`
+    Variable  string  `json:"variable"`
+    ExampleID string  `json:"example_id"`
+    Index     int     `json:"index"`     
+    IsFinal   bool    `json:"is_final"`
 }
 
 // для бд
