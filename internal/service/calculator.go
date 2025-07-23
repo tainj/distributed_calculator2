@@ -13,11 +13,12 @@ import (
 
 type CalculatorService struct {
 	repo repo.RedisResultRepository
+	repoExamples repo.ExampleRepository
 	kafkaQueue kafka.TaskQueue
 }
 
-func NewCalculatorService(repo *repo.RedisResultRepository, kafkaQueue *kafka.KafkaQueue) *CalculatorService {
-	return &CalculatorService{repo: *repo, kafkaQueue: kafkaQueue}
+func NewCalculatorService(repo *repo.RedisResultRepository, kafkaQueue *kafka.KafkaQueue, repoExample *repo.PostgresResultRepository) *CalculatorService {
+	return &CalculatorService{repo: *repo, kafkaQueue: kafkaQueue, repoExamples: repoExample}
 }
 
 func (s *CalculatorService) Calculate(ctx context.Context, example *models.Example) (*models.Example, error) {
@@ -32,6 +33,11 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
 		Expression: example.Expression,
 		SimpleExamples: results,
 		Response: variable,
+	}
+
+	err := s.repoExamples.SaveExample(ctx, example)
+	if err != nil {
+		return nil, fmt.Errorf("Calculate: save example: %v", err)
 	}
 
 	for _, task := range results {

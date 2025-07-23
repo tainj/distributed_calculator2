@@ -15,5 +15,9 @@ func NewRedisResultRepository(cache *cache.CACHE) *RedisResultRepository {
 }
 
 func (r *RedisResultRepository) SaveResult(ctx context.Context, variable string, result float64) error {
-    return r.cache.SetByKey(ctx, fmt.Sprintf("result:%s", variable), result)
+    err := r.cache.SetByKey(ctx, fmt.Sprintf("result:%s", variable), result)
+	if err != nil {
+		return fmt.Errorf("repository.SaveResult: %w", err)
+	}
+	return nil
 }

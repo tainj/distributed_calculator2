@@ -14,6 +14,7 @@ import (
 	"github.com/tainj/distributed_calculator2/internal/worker"
 	"github.com/tainj/distributed_calculator2/pkg/config"
 	"github.com/tainj/distributed_calculator2/pkg/db/cache"
+	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
 	"github.com/tainj/distributed_calculator2/pkg/logger"
 	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
@@ -36,11 +37,13 @@ func main() {
 		panic("failed to load config")
 	}
 
-	// db, err := postgres.New(cfg.Postgres)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	panic(err)
-	// }
+	db, err := postgres.New(cfg.Postgres)
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+
+	repoExample := repo.NewPostgresResultRepository(db)
 
 	redis := cache.New(cfg.Redis)
 	fmt.Println(redis.Client.Ping(ctx))
@@ -57,7 +60,7 @@ func main() {
 
 	// Создаем репозиторий и сервис
 	repo := repo.NewRedisResultRepository(redis)
-	srv := service.NewCalculatorService(repo, kafkaQueue)
+	srv := service.NewCalculatorService(repo, kafkaQueue, repoExample)
 
 	// Создаем и запускаем воркер
 	worker := worker.NewWorker(repo, kafkaQueue, valueProvider)
