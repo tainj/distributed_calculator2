@@ -30,6 +30,6 @@ func (s *CalculatorService) Calculate(ctx context.Context, req *client.Calculati
 	}
 	r := pointer.Get(resp)
 	return &client.CalculationResponse{
-		TaskId: r.Response,
+		TaskId: r.Id,
 	}, nil
 }
