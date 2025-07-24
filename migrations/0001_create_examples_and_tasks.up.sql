@@ -1,39 +1,75 @@
-CREATE TABLE IF NOT EXISTS examples (
+-- ===================================
+-- Создаём функцию для auto-updated_at
+-- ===================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- ===================================
+-- Таблица: users
+-- ===================================
+CREATE TABLE users (
     id VARCHAR(64) PRIMARY KEY,
-    expression TEXT NOT NULL,
-    response VARCHAR(64) NOT NULL, -- variable
-    calculated BOOLEAN NOT NULL DEFAULT FALSE,
-    result DOUBLE PRECISION,
-    user_id VARCHAR(64) NOT NULL,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user', -- 'user', 'admin'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Индекс по пользователю — для быстрого поиска
-CREATE INDEX IF NOT EXISTS idx_examples_user_id ON examples(user_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);
 
-CREATE TABLE IF NOT EXISTS tasks (
+-- ===================================
+-- Таблица: examples
+-- ===================================
+CREATE TABLE examples (
+    id VARCHAR(64) PRIMARY KEY,
+    expression TEXT NOT NULL,
+    response VARCHAR(64) NOT NULL, -- variable финального результата
+    calculated BOOLEAN NOT NULL DEFAULT FALSE,
+    result DOUBLE PRECISION,
+    error TEXT, -- например, "division by zero"
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_examples_user_id ON examples(user_id);
+CREATE INDEX idx_examples_calculated ON examples(calculated);
+
+-- ===================================
+-- Таблица: tasks (промежуточные шаги для отчёта)
+-- ===================================
+CREATE TABLE tasks (
     id VARCHAR(64) PRIMARY KEY,
     example_id VARCHAR(64) NOT NULL REFERENCES examples(id) ON DELETE CASCADE,
-    
-    -- Числовые значения (уже разрешённые)
     value1 FLOAT8 NOT NULL,
     value2 FLOAT8 NOT NULL,
     result FLOAT8 NOT NULL,
-    
-    -- Операция
     sign VARCHAR(2) NOT NULL,
-    
-    -- Имя переменной, куда сохранён результат
     variable VARCHAR(64) NOT NULL,
-    
-    -- Порядок шага
     "order" INTEGER NOT NULL,
-    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tasks_example_id ON tasks(example_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_variable ON tasks(variable);
-CREATE INDEX IF NOT EXISTS idx_tasks_order ON tasks("order");
+CREATE INDEX idx_tasks_example_id ON tasks(example_id);
+CREATE INDEX idx_tasks_variable ON tasks(variable);
 
+-- ===================================
+-- Триггеры для auto-updated_at
+-- ===================================
+CREATE TRIGGER update_examples_updated_at
+    BEFORE UPDATE ON examples
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

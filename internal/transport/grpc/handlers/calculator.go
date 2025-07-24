@@ -22,7 +22,7 @@ func NewOrderService(srv Service) *CalculatorService {
 	return &CalculatorService{service: srv}
 }
 
-func (s *CalculatorService) Calculate(ctx context.Context, req *client.CalculationRequest) (*client.CalculationResponse, error) {
+func (s *CalculatorService) Calculate(ctx context.Context, req *client.CalculateRequest) (*client.CalculateResponse, error) {
 	resp, err := s.service.Calculate(ctx, &models.Example{
 		Expression: req.GetExpression(),
 	})
@@ -30,7 +30,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, req *client.Calculati
 		return nil, fmt.Errorf("Calculate: %w", err)
 	}
 	r := pointer.Get(resp)
-	return &client.CalculationResponse{
+	return &client.CalculateResponse{
 		TaskId: r.Id,
 	}, nil
 }
