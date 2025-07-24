@@ -19,16 +19,32 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Calculator_Calculate_FullMethodName = "/calculator.Calculator/Calculate"
-	Calculator_GetResult_FullMethodName = "/calculator.Calculator/GetResult"
+	Calculator_Calculate_FullMethodName           = "/calculator.Calculator/Calculate"
+	Calculator_GetResult_FullMethodName           = "/calculator.Calculator/GetResult"
+	Calculator_GetAllExamples_FullMethodName      = "/calculator.Calculator/GetAllExamples"
+	Calculator_GetCalculationTrace_FullMethodName = "/calculator.Calculator/GetCalculationTrace"
+	Calculator_Register_FullMethodName            = "/calculator.Calculator/Register"
+	Calculator_Login_FullMethodName               = "/calculator.Calculator/Login"
 )
 
 // CalculatorClient is the client API for Calculator service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// ================== Основной сервис ==================
 type CalculatorClient interface {
-	Calculate(ctx context.Context, in *CalculationRequest, opts ...grpc.CallOption) (*CalculationResponse, error)
+	// Вычислить выражение
+	Calculate(ctx context.Context, in *CalculateRequest, opts ...grpc.CallOption) (*CalculateResponse, error)
+	// Получить результат по ID (через тело)
 	GetResult(ctx context.Context, in *GetResultRequest, opts ...grpc.CallOption) (*GetResultResponse, error)
+	// Получить все примеры пользователя
+	GetAllExamples(ctx context.Context, in *GetAllExamplesRequest, opts ...grpc.CallOption) (*GetAllExamplesResponse, error)
+	// Получить пошаговый отчёт вычисления (через тело!)
+	GetCalculationTrace(ctx context.Context, in *GetCalculationTraceRequest, opts ...grpc.CallOption) (*GetCalculationTraceResponse, error)
+	// Регистрация
+	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	// Авторизация
+	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 }
 
 type calculatorClient struct {
@@ -39,9 +55,9 @@ func NewCalculatorClient(cc grpc.ClientConnInterface) CalculatorClient {
 	return &calculatorClient{cc}
 }
 
-func (c *calculatorClient) Calculate(ctx context.Context, in *CalculationRequest, opts ...grpc.CallOption) (*CalculationResponse, error) {
+func (c *calculatorClient) Calculate(ctx context.Context, in *CalculateRequest, opts ...grpc.CallOption) (*CalculateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CalculationResponse)
+	out := new(CalculateResponse)
 	err := c.cc.Invoke(ctx, Calculator_Calculate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -59,12 +75,64 @@ func (c *calculatorClient) GetResult(ctx context.Context, in *GetResultRequest, 
 	return out, nil
 }
 
+func (c *calculatorClient) GetAllExamples(ctx context.Context, in *GetAllExamplesRequest, opts ...grpc.CallOption) (*GetAllExamplesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllExamplesResponse)
+	err := c.cc.Invoke(ctx, Calculator_GetAllExamples_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *calculatorClient) GetCalculationTrace(ctx context.Context, in *GetCalculationTraceRequest, opts ...grpc.CallOption) (*GetCalculationTraceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCalculationTraceResponse)
+	err := c.cc.Invoke(ctx, Calculator_GetCalculationTrace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *calculatorClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, Calculator_Register_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *calculatorClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, Calculator_Login_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CalculatorServer is the server API for Calculator service.
 // All implementations must embed UnimplementedCalculatorServer
 // for forward compatibility.
+//
+// ================== Основной сервис ==================
 type CalculatorServer interface {
-	Calculate(context.Context, *CalculationRequest) (*CalculationResponse, error)
+	// Вычислить выражение
+	Calculate(context.Context, *CalculateRequest) (*CalculateResponse, error)
+	// Получить результат по ID (через тело)
 	GetResult(context.Context, *GetResultRequest) (*GetResultResponse, error)
+	// Получить все примеры пользователя
+	GetAllExamples(context.Context, *GetAllExamplesRequest) (*GetAllExamplesResponse, error)
+	// Получить пошаговый отчёт вычисления (через тело!)
+	GetCalculationTrace(context.Context, *GetCalculationTraceRequest) (*GetCalculationTraceResponse, error)
+	// Регистрация
+	Register(context.Context, *RegisterRequest) (*AuthResponse, error)
+	// Авторизация
+	Login(context.Context, *LoginRequest) (*AuthResponse, error)
 	mustEmbedUnimplementedCalculatorServer()
 }
 
@@ -75,11 +143,23 @@ type CalculatorServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCalculatorServer struct{}
 
-func (UnimplementedCalculatorServer) Calculate(context.Context, *CalculationRequest) (*CalculationResponse, error) {
+func (UnimplementedCalculatorServer) Calculate(context.Context, *CalculateRequest) (*CalculateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Calculate not implemented")
 }
 func (UnimplementedCalculatorServer) GetResult(context.Context, *GetResultRequest) (*GetResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetResult not implemented")
+}
+func (UnimplementedCalculatorServer) GetAllExamples(context.Context, *GetAllExamplesRequest) (*GetAllExamplesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllExamples not implemented")
+}
+func (UnimplementedCalculatorServer) GetCalculationTrace(context.Context, *GetCalculationTraceRequest) (*GetCalculationTraceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCalculationTrace not implemented")
+}
+func (UnimplementedCalculatorServer) Register(context.Context, *RegisterRequest) (*AuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
+}
+func (UnimplementedCalculatorServer) Login(context.Context, *LoginRequest) (*AuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Login not implemented")
 }
 func (UnimplementedCalculatorServer) mustEmbedUnimplementedCalculatorServer() {}
 func (UnimplementedCalculatorServer) testEmbeddedByValue()                    {}
@@ -103,7 +183,7 @@ func RegisterCalculatorServer(s grpc.ServiceRegistrar, srv CalculatorServer) {
 }
 
 func _Calculator_Calculate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CalculationRequest)
+	in := new(CalculateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -115,7 +195,7 @@ func _Calculator_Calculate_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: Calculator_Calculate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CalculatorServer).Calculate(ctx, req.(*CalculationRequest))
+		return srv.(CalculatorServer).Calculate(ctx, req.(*CalculateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -138,6 +218,78 @@ func _Calculator_GetResult_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Calculator_GetAllExamples_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllExamplesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CalculatorServer).GetAllExamples(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Calculator_GetAllExamples_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CalculatorServer).GetAllExamples(ctx, req.(*GetAllExamplesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Calculator_GetCalculationTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCalculationTraceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CalculatorServer).GetCalculationTrace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Calculator_GetCalculationTrace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CalculatorServer).GetCalculationTrace(ctx, req.(*GetCalculationTraceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Calculator_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CalculatorServer).Register(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Calculator_Register_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CalculatorServer).Register(ctx, req.(*RegisterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Calculator_Login_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CalculatorServer).Login(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Calculator_Login_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CalculatorServer).Login(ctx, req.(*LoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Calculator_ServiceDesc is the grpc.ServiceDesc for Calculator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +304,22 @@ var Calculator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetResult",
 			Handler:    _Calculator_GetResult_Handler,
+		},
+		{
+			MethodName: "GetAllExamples",
+			Handler:    _Calculator_GetAllExamples_Handler,
+		},
+		{
+			MethodName: "GetCalculationTrace",
+			Handler:    _Calculator_GetCalculationTrace_Handler,
+		},
+		{
+			MethodName: "Register",
+			Handler:    _Calculator_Register_Handler,
+		},
+		{
+			MethodName: "Login",
+			Handler:    _Calculator_Login_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
