@@ -1,4 +1,4 @@
-package grpc
+package handlers
 
 import (
 	"context"
@@ -18,7 +18,7 @@ type CalculatorService struct {
 	service Service
 }
 
-func NewOrderService(srv Service) *CalculatorService {
+func NewCalculatorService(srv Service) *CalculatorService {
 	return &CalculatorService{service: srv}
 }
 
