@@ -16,7 +16,7 @@ type CalculatorService struct {
 	kafkaQueue kafka.TaskQueue
 }
 
-func NewCalculatorService(kafkaQueue *kafka.KafkaQueue, repoExample *repo.PostgresResultRepository) *CalculatorService {
+func NewCalculatorService(kafkaQueue kafka.TaskQueue, repoExample repo.ExampleRepository) *CalculatorService {
 	return &CalculatorService{kafkaQueue: kafkaQueue, repoExamples: repoExample}
 }
 
@@ -52,9 +52,9 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
             Num2:      task.Num2,
             Sign:      task.Sign,
             Variable:  task.Variable,
-            ExampleID: exampleID,        // привязка к Example
-            Index:     i,                // порядок
-            IsFinal:   task.Variable == variable, // это финальный результат?
+            ExampleID: exampleID,
+            Index:     i,
+            IsFinal:   task.Variable == variable,
         }
 
         if err := s.kafkaQueue.SendTask(kafkaTask); err != nil {

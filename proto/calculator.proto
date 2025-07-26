@@ -27,15 +27,15 @@ service Calculator {
   // Получить все примеры пользователя
   rpc GetAllExamples(GetAllExamplesRequest) returns (GetAllExamplesResponse) {
     option (google.api.http) = {
-      post: "/v1/examples"  // Меняем на POST
-      body: "*"             // Теперь может быть фильтрация
+      post: "/v1/examples"
+      body: "*"
     };
   }
 
   // Получить пошаговый отчёт вычисления (через тело!)
   rpc GetCalculationTrace(GetCalculationTraceRequest) returns (GetCalculationTraceResponse) {
     option (google.api.http) = {
-      post: "/v1/trace"     // Было GET с {task_id} в пути → стало POST с телом
+      post: "/v1/trace"
       body: "*"
     };
   }

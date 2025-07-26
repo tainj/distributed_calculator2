@@ -8,22 +8,22 @@ import (
     "log"
 
     "github.com/tainj/distributed_calculator2/internal/models"
-    "github.com/tainj/distributed_calculator2/internal/repository"
+    repo "github.com/tainj/distributed_calculator2/internal/repository"
     "github.com/tainj/distributed_calculator2/internal/valueprovider"
     "github.com/tainj/distributed_calculator2/pkg/calculator"
     "github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
 type Worker struct {
-    exampleRepo   repository.ExampleRepository
-    cacheRepo     repository.CacheRepository
+    exampleRepo   repo.ExampleRepository
+    cacheRepo     repo.VariableRepository
     kafkaQueue    kafka.TaskQueue
     valueProvider valueprovider.Provider
 }
 
 func NewWorker(
-    exampleRepo repository.ExampleRepository,
-    cacheRepo repository.CacheRepository,
+    exampleRepo repo.ExampleRepository,
+    cacheRepo repo.VariableRepository,
     kafkaQueue kafka.TaskQueue,
     valueProvider valueprovider.Provider,
 ) *Worker {

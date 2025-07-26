@@ -6,9 +6,9 @@ import (
 	"github.com/tainj/distributed_calculator2/internal/models"
 )
 
-type CacheRepository interface {
+type VariableRepository interface {
     SetResult(ctx context.Context, variable string, result float64) error
-    // GetResult(ctx context.Context, variable string, dest *float64) error
+    // GetResult(ctx context.Context, variable string) (float64, error)
 }
 
 type ExampleRepository interface {
@@ -16,4 +16,11 @@ type ExampleRepository interface {
     UpdateExample(ctx context.Context, exampleId string, result float64) error
     GetResult(ctx context.Context, exampleID string) (float64, error)
     // GetExamples(ctx context.Context, userID string) ([]models.Example, error)
+}
+
+type UserRepository interface {
+    Register(ctx context.Context, user *models.User) error
+    GetByUsername(ctx context.Context, username string) (*models.User, error)
+    GetByEmail(ctx context.Context, email string) (*models.User, error)
+    GetByID(ctx context.Context, id string) (*models.User, error)
 }

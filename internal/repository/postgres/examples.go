@@ -11,12 +11,12 @@ import (
 	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
 )
 
-type PostgresResultRepository struct {
-	db *postgres.DB
+func NewPostgresResultRepository(db *postgres.DB) *PostgresResultRepository {
+    return &PostgresResultRepository{db: db}
 }
 
-func NewPostgresResultRepository(db *postgres.DB) *PostgresResultRepository {
-	return &PostgresResultRepository{db: db}
+type PostgresResultRepository struct {
+	db *postgres.DB
 }
 
 func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *models.Example) error {
@@ -39,7 +39,7 @@ func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *mod
 func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId string, result float64) error {
     query := sq.Update("examples").
         Set("calculated", true).
-        Set("result", result). // *float64, может быть nil
+        Set("result", result).
         Where(sq.Eq{"id": exampleId}).
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)

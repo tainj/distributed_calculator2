@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
 	repo "github.com/tainj/distributed_calculator2/internal/repository"
 	service "github.com/tainj/distributed_calculator2/internal/service"
 	"github.com/tainj/distributed_calculator2/internal/transport/grpc"
@@ -43,10 +42,10 @@ func main() {
 		panic(err)
 	}
 
-	repoExample := repo.NewPostgresResultRepository(db)
-
 	redis := cache.New(cfg.Redis)
 	fmt.Println(redis.Client.Ping(ctx))
+
+	factory := repo.NewRepositoryFactory(db, redis)
 
 	// Инициализация Kafka
 	kafkaQueue, err := kafka.NewKafkaQueue(cfg.Kafka)
@@ -59,7 +58,8 @@ func main() {
 	valueProvider := valueprovider.NewRedisValueProvider(redis)
 
 	// Создаем репозиторий и сервис
-	repo := repo.NewRedisResultRepository(redis)
+	repo := factory.CreateVariableRepository()
+	repoExample := factory.CreateExampleRepository()
 	srv := service.NewCalculatorService(kafkaQueue, repoExample)
 
 	// Создаем и запускаем воркер
