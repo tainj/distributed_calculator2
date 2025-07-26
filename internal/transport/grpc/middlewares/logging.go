@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/tainj/distributed_calculator2/internal/transport/grpc/auth"
 	"github.com/tainj/distributed_calculator2/pkg/logger"
+    "github.com/tainj/distributed_calculator2/internal/auth"
 )
 
 // LoggerProvider добавляет логгер в контекст запроса
@@ -47,7 +46,7 @@ func Logging() Middleware {
 
             defer func() {
                 duration := time.Since(start).Milliseconds()
-                userId := auth.UserIdFromCtx(r.Context()) // Получаем userId из контекста
+                userId := auth.UserIDFromCtx(r.Context()) // Получаем userId из контекста
 
                 // Формируем атрибуты для лога
                 attrs := []any{

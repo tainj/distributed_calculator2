@@ -1,91 +1,110 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	repo "github.com/tainj/distributed_calculator2/internal/repository"
-	service "github.com/tainj/distributed_calculator2/internal/service"
-	"github.com/tainj/distributed_calculator2/internal/transport/grpc"
-	"github.com/tainj/distributed_calculator2/internal/valueprovider"
-	"github.com/tainj/distributed_calculator2/internal/worker"
-	"github.com/tainj/distributed_calculator2/pkg/config"
-	"github.com/tainj/distributed_calculator2/pkg/db/cache"
-	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
-	"github.com/tainj/distributed_calculator2/pkg/logger"
-	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
+    "context"
+    "fmt"
+    "os"
+    "os/signal"
+    "syscall"
+
+    "github.com/tainj/distributed_calculator2/internal/auth"
+    repo "github.com/tainj/distributed_calculator2/internal/repository"
+    service "github.com/tainj/distributed_calculator2/internal/service"
+    "github.com/tainj/distributed_calculator2/internal/transport/grpc"
+    "github.com/tainj/distributed_calculator2/internal/valueprovider"
+    "github.com/tainj/distributed_calculator2/internal/worker"
+    "github.com/tainj/distributed_calculator2/pkg/config"
+    "github.com/tainj/distributed_calculator2/pkg/db/cache"
+    "github.com/tainj/distributed_calculator2/pkg/db/postgres"
+    "github.com/tainj/distributed_calculator2/pkg/logger"
+    "github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
 const (
-	serviceName = "distributed_calculator"
+    serviceName = "distributed_calculator"
 )
 
 func main() {
-	ctx := context.Background()
-	mainLogger := logger.New(serviceName)
-	ctx = context.WithValue(ctx, logger.LoggerKey, mainLogger)
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		fmt.Println(err)
-		panic(err)
-	}
-	
-	if cfg == nil {
-		panic("failed to load config")
-	}
+    // базовый контекст
+    ctx := context.Background()
 
-	db, err := postgres.New(cfg.Postgres)
-	if err != nil {
-		fmt.Println(err)
-		panic(err)
-	}
+    // инициализируем логгер
+    mainLogger := logger.New(serviceName)
+    ctx = context.WithValue(ctx, logger.LoggerKey, mainLogger)
 
-	redis := cache.New(cfg.Redis)
-	fmt.Println(redis.Client.Ping(ctx))
+    // загружаем конфиг
+    cfg, err := config.LoadConfig()
+    if err != nil {
+        fmt.Println(err)
+        panic(err)
+    }
+    if cfg == nil {
+        panic("failed to load config")
+    }
 
-	factory := repo.NewRepositoryFactory(db, redis)
+    // 1. база данных
+    db, err := postgres.New(cfg.Postgres)
+    if err != nil {
+        fmt.Println(err)
+        panic(err)
+    }
 
-	// Инициализация Kafka
-	kafkaQueue, err := kafka.NewKafkaQueue(cfg.Kafka)
-	if err != nil {
-		mainLogger.Error(ctx, "Failed to init Kafka: "+err.Error())
-		panic(err)
-	}
+    // 2. кэш (redis)
+    redis := cache.New(cfg.Redis)
+    fmt.Println(redis.Client.Ping(ctx)) // проверяем соединение
 
-	// Создаём valueProvider
-	valueProvider := valueprovider.NewRedisValueProvider(redis)
+    // 3. фабрика репозиториев
+    factory := repo.NewRepositoryFactory(db, redis)
 
-	// Создаем репозиторий и сервис
-	repo := factory.CreateVariableRepository()
-	repoExample := factory.CreateExampleRepository()
-	srv := service.NewCalculatorService(kafkaQueue, repoExample)
+    // 4. jwt сервис — нужен для auth middleware
+    jwtService := auth.NewJWTService(cfg.JWT)
 
-	// Создаем и запускаем воркер
-	worker := worker.NewWorker(repoExample, repo, kafkaQueue, valueProvider)
-	go worker.Start() // Запускаем воркер в отдельной горутине
+    // 5. kafka — очередь задач
+    kafkaQueue, err := kafka.NewKafkaQueue(cfg.Kafka)
+    if err != nil {
+        mainLogger.Error(ctx, "failed to init kafka: "+err.Error())
+        panic(err)
+    }
 
+    // 6. valueprovider — для получения переменных из redis
+    valueProvider := valueprovider.NewRedisValueProvider(redis)
 
-	grpcserver, err := grpc.New(ctx, cfg.Grpc.GRPCPort, cfg.Grpc.RestPort, srv)
-	if err != nil {
-		mainLogger.Error(ctx, err.Error())
-		return
-	}
+    // 7. репозитории
+    variableRepo := factory.CreateVariableRepository() // для сохранения результатов
+    exampleRepo := factory.CreateExampleRepository()   // для сохранения выражений
+	userRepo := factory.CreateUserRepository()
 
-	graceCh := make(chan os.Signal, 1)
-	signal.Notify(graceCh, syscall.SIGINT, syscall.SIGTERM)
+    // 8. сервис калькулятора
+    srv := service.NewCalculatorService(userRepo, kafkaQueue, exampleRepo)
 
-	go func() {
-		if err := grpcserver.Start(ctx); err != nil {
-			mainLogger.Error(ctx, err.Error())
-		}
-	}()
+    // 9. воркер — обрабатывает задачи из kafka
+    worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider)
+    go worker.Start() // в отдельной горутине
 
-	<-graceCh
+    // 10. grpc сервер (gRPC + REST через gateway)
+    grpcServer, err := grpc.New(ctx, cfg.Grpc.GRPCPort, cfg.Grpc.RestPort, srv, jwtService)
+    if err != nil {
+        mainLogger.Error(ctx, err.Error())
+        return
+    }
 
-	if err := grpcserver.Stop(ctx); err != nil {
-		mainLogger.Error(ctx, err.Error())
-	}
-	mainLogger.Info(ctx, "Server stopped")
+    // graceful shutdown
+    graceCh := make(chan os.Signal, 1)
+    signal.Notify(graceCh, syscall.SIGINT, syscall.SIGTERM)
+
+    // запускаем сервер асинхронно
+    go func() {
+        if err := grpcServer.Start(ctx); err != nil {
+            mainLogger.Error(ctx, err.Error())
+        }
+    }()
+
+    // ждём сигнала остановки
+    <-graceCh
+
+    // останавливаем
+    if err := grpcServer.Stop(ctx); err != nil {
+        mainLogger.Error(ctx, err.Error())
+    }
+    mainLogger.Info(ctx, "server stopped")
 }

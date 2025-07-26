@@ -9,9 +9,9 @@ import (
     "net/http"
 
     "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+    "github.com/tainj/distributed_calculator2/internal/auth"
     "github.com/tainj/distributed_calculator2/internal/transport/grpc/handlers"
-    "github.com/tainj/distributed_calculator2/internal/transport/grpc/auth"
-	"github.com/tainj/distributed_calculator2/internal/transport/grpc/middlewares"
+    "github.com/tainj/distributed_calculator2/internal/transport/grpc/middlewares"
     client "github.com/tainj/distributed_calculator2/pkg/api"
     "github.com/tainj/distributed_calculator2/pkg/logger"
     "golang.org/x/sync/errgroup"
@@ -24,60 +24,64 @@ type Server struct {
     listener   net.Listener
 }
 
-func New(ctx context.Context, port, restPort int, service handlers.Service) (*Server, error) {
+// new создаёт gRPC + REST сервер с middleware
+func New(ctx context.Context, 
+    port, restPort int, 
+    service handlers.Service,
+    jwtService *auth.JWTService,) (*Server, error) {
+    // слушаем порт для gRPC
     lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
     if err != nil {
         log.Fatalf("failed to listen: %v", err)
     }
 
-    // Создаем security handler
-    securityHandler := auth.NewSecurityHandler()
-
-    // Настраиваем gRPC сервер с interceptor'ами
+    // настраиваем gRPC с interceptor'ами
     opts := []grpc.ServerOption{
         grpc.ChainUnaryInterceptor(
-            handlers.ContextWithLogger(logger.GetLoggerFromCtx(ctx)),
-            securityHandler.AuthInterceptor, // ← Аутентификация для gRPC
+            handlers.ContextWithLogger(logger.GetLoggerFromCtx(ctx)), // логгер в контекст
         ),
     }
 
     grpcServer := grpc.NewServer(opts...)
     client.RegisterCalculatorServer(grpcServer, handlers.NewCalculatorService(service))
 
-    // Создаем gRPC-gateway
+    // создаём REST шлюз (grpc-gateway)
     restSrv := runtime.NewServeMux()
     if err := client.RegisterCalculatorHandlerServer(context.Background(), restSrv, handlers.NewCalculatorService(service)); err != nil {
         return nil, err
     }
 
-    // Оборачиваем gateway в HTTP middleware
+    // оборачиваем в middleware: логирование, auth, etc
     finalHandler := middlewares.Apply(restSrv,
-        middlewares.LoggerProvider("calculator-gateway"),
-        middlewares.AuthMiddleware(), // ← Аутентификация для HTTP
-        middlewares.Logging(),
+        middlewares.LoggerProvider("calculator-gateway"), // логгер для HTTP
+        middlewares.AuthMiddleware(jwtService),           // проверка JWT
+        middlewares.Logging(),                           // логируем запросы
     )
 
-    // Создаем HTTP сервер с обернутым handler'ом
+    // создаём HTTP сервер
     httpServer := &http.Server{
-        Addr:    fmt.Sprintf(":%d", restPort),
-        Handler: finalHandler, // ← ВАЖНО: используем finalHandler, а не restSrv
+        Addr:    fmt.Sprintf(":%d", restPort), // порт для REST
+        Handler: finalHandler,                 // используем обработчик с middleware
     }
     
     return &Server{grpcServer, httpServer, lis}, nil
 }
 
+// start запускает gRPC и REST серверы
 func (s *Server) Start(ctx context.Context) error {
     eg := errgroup.Group{}
 
+    // запускаем gRPC
     eg.Go(func() error {
-        slog.InfoContext(ctx, "Starting gRPC server",
+        slog.InfoContext(ctx, "starting gRPC server",
             "port", s.listener.Addr().(*net.TCPAddr).Port,
         )
         return s.grpcServer.Serve(s.listener)
     })
 
+    // запускаем REST
     eg.Go(func() error {
-        slog.InfoContext(ctx, "Starting REST server",
+        slog.InfoContext(ctx, "starting REST server",
             "port", s.restServer.Addr,
         )
         return s.restServer.ListenAndServe()
@@ -86,6 +90,7 @@ func (s *Server) Start(ctx context.Context) error {
     return eg.Wait()
 }
 
+// stop останавливает серверы
 func (s *Server) Stop(ctx context.Context) error {
     s.grpcServer.GracefulStop()
     l := logger.GetLoggerFromCtx(ctx)

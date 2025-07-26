@@ -1,14 +1,14 @@
 package repository
 
 import (
-	"context"
-	"database/sql"
-	"errors"
-	"fmt"
+    "context"
+    "database/sql"
+    "errors"
+    "fmt"
 
-	sq "github.com/Masterminds/squirrel"
-	"github.com/tainj/distributed_calculator2/internal/models"
-	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+    sq "github.com/Masterminds/squirrel"
+    "github.com/tainj/distributed_calculator2/internal/models"
+    "github.com/tainj/distributed_calculator2/pkg/db/postgres"
 )
 
 func NewPostgresResultRepository(db *postgres.DB) *PostgresResultRepository {
@@ -16,19 +16,19 @@ func NewPostgresResultRepository(db *postgres.DB) *PostgresResultRepository {
 }
 
 type PostgresResultRepository struct {
-	db *postgres.DB
+    db *postgres.DB
 }
 
 func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *models.Example) error {
+    // формируем запрос для сохранения примера в бд
     query := sq.Insert("examples").
         Columns("id", "expression", "response", "user_id", "calculated").
         Values(example.Id, example.Expression, example.Response, "1", false).
-        Suffix("RETURNING id").
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)
 
-    var insertedID string
-    err := query.QueryRowContext(ctx).Scan(&insertedID)
+    // выполняем вставку, проверяем ошибки
+    _, err := query.ExecContext(ctx)
     if err != nil {
         return fmt.Errorf("repository.SaveExample: failed to insert example: %w", err)
     }
@@ -37,6 +37,7 @@ func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *mod
 }
 
 func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId string, result float64) error {
+    // обновляем статус и результат по id
     query := sq.Update("examples").
         Set("calculated", true).
         Set("result", result).
@@ -44,6 +45,7 @@ func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId 
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)
 
+    // применяем изменения
     _, err := query.ExecContext(ctx)
     if err != nil {
         return fmt.Errorf("repository.UpdateExample: %w", err)
@@ -53,6 +55,7 @@ func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId 
 }
 
 func (r *PostgresResultRepository) GetResult(ctx context.Context, exampleID string) (float64, error) {
+    // запрашиваем результат по id
     query := sq.Select("result").
         From("examples").
         Where(sq.Eq{"id": exampleID}).
@@ -60,15 +63,19 @@ func (r *PostgresResultRepository) GetResult(ctx context.Context, exampleID stri
         RunWith(r.db.Db)
 
     var example models.UserExample
+    // сканируем результат
     err := query.QueryRowContext(ctx).Scan(
         &example.Result,
     )
     if err != nil {
+        // если нет строки — ошибка not found
         if errors.Is(err, sql.ErrNoRows) {
             return 0, fmt.Errorf("repository.GetResult: example not found")
         }
+        // любая другая ошибка бд
         return 0, fmt.Errorf("repository.GetResult: failed to get example: %w", err)
     }
 
+    // разыменовываем указатель на результат
     return *example.Result, nil
 }

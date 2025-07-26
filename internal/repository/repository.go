@@ -8,7 +8,6 @@ import (
 
 type VariableRepository interface {
     SetResult(ctx context.Context, variable string, result float64) error
-    // GetResult(ctx context.Context, variable string) (float64, error)
 }
 
 type ExampleRepository interface {

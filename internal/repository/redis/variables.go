@@ -21,11 +21,3 @@ func (r *RedisResultRepository) SetResult(ctx context.Context, variable string, 
 	}
 	return nil
 }
-
-func (r *RedisResultRepository) GetResult(ctx context.Context, variable string, result float64) error {
-    err := r.cache.GetByKey(ctx, fmt.Sprintf("result:%s", variable), result)
-	if err != nil {
-		return fmt.Errorf("repository.GetResult: %w", err)
-	}
-	return nil
-}

@@ -6,7 +6,7 @@ option go_package = "github.com/tainj/distributed_calculator2/pkg/api";
 
 import "google/api/annotations.proto";
 
-// ================== Основной сервис ==================
+// ================== ОСНОВНОЙ СЕРВИС ==================
 service Calculator {
   // Вычислить выражение
   rpc Calculate(CalculateRequest) returns (CalculateResponse) {
@@ -16,7 +16,7 @@ service Calculator {
     };
   }
 
-  // Получить результат по ID (через тело)
+  // Получить результат — через ТЕЛО, как ты любишь
   rpc GetResult(GetResultRequest) returns (GetResultResponse) {
     option (google.api.http) = {
       post: "/v1/result"
@@ -24,7 +24,7 @@ service Calculator {
     };
   }
 
-  // Получить все примеры пользователя
+  // Получить все примеры — через тело
   rpc GetAllExamples(GetAllExamplesRequest) returns (GetAllExamplesResponse) {
     option (google.api.http) = {
       post: "/v1/examples"
@@ -32,7 +32,7 @@ service Calculator {
     };
   }
 
-  // Получить пошаговый отчёт вычисления (через тело!)
+  // Получить трассировку — через тело
   rpc GetCalculationTrace(GetCalculationTraceRequest) returns (GetCalculationTraceResponse) {
     option (google.api.http) = {
       post: "/v1/trace"
@@ -40,16 +40,16 @@ service Calculator {
     };
   }
 
-  // Регистрация
-  rpc Register(RegisterRequest) returns (AuthResponse) {
+  // Регистрация — через тело
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
     option (google.api.http) = {
       post: "/v1/register"
       body: "*"
     };
   }
 
-  // Авторизация
-  rpc Login(LoginRequest) returns (AuthResponse) {
+  // Логин — через тело
+  rpc Login(LoginRequest) returns (LoginResponse) {
     option (google.api.http) = {
       post: "/v1/login"
       body: "*"
@@ -57,24 +57,21 @@ service Calculator {
   }
 }
 
-// ================== МодЕЛИ ==================
+// ================== МОДЕЛИ ==================
 
-// Запрос на вычисление
 message CalculateRequest {
   string expression = 1;
 }
 
-// Ответ: ID задачи
 message CalculateResponse {
   string task_id = 1;
 }
 
-// Запрос результата (через тело)
+// 🔥 ВАЖНО: task_id — в теле, не в URL, не в query, НИГДЕ ЕЩЁ
 message GetResultRequest {
   string task_id = 1;
 }
 
-// Ответ: либо результат, либо ошибка
 message GetResultResponse {
   oneof result {
     double value = 1;
@@ -82,17 +79,14 @@ message GetResultResponse {
   }
 }
 
-// Запрос всех примеров (можно расширить: pagination, filter)
 message GetAllExamplesRequest {
-  // Пока пусто, но можно добавить later
+  // Пусто — но можно расширить
 }
 
-// Ответ: список примеров
 message GetAllExamplesResponse {
   repeated Example examples = 1;
 }
 
-// Пример (одно выражение)
 message Example {
   string id = 1;
   string expression = 2;
@@ -101,35 +95,35 @@ message Example {
   string created_at = 5;
 }
 
-// Запрос трассировки вычисления
 message GetCalculationTraceRequest {
-  string task_id = 1;
+  string task_id = 1;  // 🔥 ОПЯТЬ В ТЕЛЕ
 }
 
-// Ответ: пошаговый отчёт
 message GetCalculationTraceResponse {
-  string full_expression = 1;  // "(2 + 7) * 4 = 36"
-  repeated string steps = 2;    // ["2 + 7 = 9", "9 * 4 = 36"]
-  optional string error = 3;    // если ошибка
+  string full_expression = 1;
+  repeated string steps = 2;
+  optional string error = 3;
 }
 
-// Запрос регистрации
 message RegisterRequest {
-  string username = 1;
-  string email = 2;
-  string password = 3;
+  string email = 1;
+  string password = 2;
 }
 
-// Запрос логина
+message RegisterResponse {
+  bool success = 1;
+  string error = 2;
+}
+
 message LoginRequest {
   string email = 1;
   string password = 2;
 }
 
-// Ответ на авторизацию
-message AuthResponse {
-  string token = 1;         // JWT
-  string username = 2;
+message LoginResponse {
+  bool success = 1;
+  string token = 2;
   string user_id = 3;
-  optional string error = 4;
+  string username = 4;
+  string error = 5;
 }

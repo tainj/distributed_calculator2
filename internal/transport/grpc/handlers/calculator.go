@@ -1,58 +1,90 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-	"github.com/AlekSi/pointer"
-	"github.com/tainj/distributed_calculator2/internal/models"
-	client "github.com/tainj/distributed_calculator2/pkg/api"
+    "context"
+    "fmt"
+    "github.com/AlekSi/pointer"
+    "github.com/tainj/distributed_calculator2/internal/models"
+    client "github.com/tainj/distributed_calculator2/pkg/api"
 )
 
+// Service — интерфейс бизнес-логики
+// чтобы можно было мокать в тестах
 type Service interface {
-	Calculate(ctx context.Context, example *models.Example) (*models.Example, error)
-	GetResult(ctx context.Context, exampleID string) (float64, error)
+    Calculate(ctx context.Context, example *models.Example) (*models.Example, error)
+    GetResult(ctx context.Context, exampleID string) (float64, error)
+    Register(ctx context.Context, user *models.UserCredentials) (*models.User, error)
 }
 
+// CalculatorService — gRPC сервер
 type CalculatorService struct {
-	client.UnimplementedCalculatorServer
-	service Service
+    client.UnimplementedCalculatorServer
+    service Service
 }
 
+// NewCalculatorService создаёт новый хендлер
 func NewCalculatorService(srv Service) *CalculatorService {
-	return &CalculatorService{service: srv}
+    return &CalculatorService{service: srv}
 }
 
+// Calculate — обрабатывает запрос на вычисление
 func (s *CalculatorService) Calculate(ctx context.Context, req *client.CalculateRequest) (*client.CalculateResponse, error) {
-	resp, err := s.service.Calculate(ctx, &models.Example{
-		Expression: req.GetExpression(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("Calculate: %w", err)
-	}
-	r := pointer.Get(resp)
-	return &client.CalculateResponse{
-		TaskId: r.Id,
-	}, nil
+    // вызываем бизнес-логику
+    resp, err := s.service.Calculate(ctx, &models.Example{
+        Expression: req.GetExpression(),
+    })
+    if err != nil {
+        return nil, fmt.Errorf("Calculate: %w", err)
+    }
+
+    // извлекаем id
+    r := pointer.Get(resp)
+    return &client.CalculateResponse{
+        TaskId: r.Id,
+    }, nil
 }
 
-// transport/grpc/calculator.go
+// GetResult — возвращает результат по id
 func (s *CalculatorService) GetResult(ctx context.Context, req *client.GetResultRequest) (*client.GetResultResponse, error) {
     taskID := req.GetTaskId()
 
-    // Получаем из бизнес-логики
+    // получаем результат
     result, err := s.service.GetResult(ctx, taskID)
     if err != nil {
+        // ошибка — кладём в oneof
         return &client.GetResultResponse{
             Result: &client.GetResultResponse_Error{
                 Error: err.Error(),
             },
-        }, nil // ❗ не возвращаем ошибку в gRPC sense, а кладём в oneof
+        }, nil
     }
 
-    // Успешно — возвращаем значение
+    // успех — возвращаем значение
     return &client.GetResultResponse{
         Result: &client.GetResultResponse_Value{
-            Value: result, // *float64 → float64
+            Value: result,
         },
+    }, nil
+}
+
+// Register — регистрирует нового пользователя
+func (s *CalculatorService) Register(ctx context.Context, req *client.RegisterRequest) (*client.RegisterResponse, error) {
+    // передаём креды в сервис
+    _, err := s.service.Register(ctx, &models.UserCredentials{
+        Email:    req.GetEmail(),    // ✅ email
+        Password: req.GetPassword(), // ✅ исправлено: не GetEmail!
+    })
+    if err != nil {
+        // возвращаем ошибку в теле, не как gRPC error
+        return &client.RegisterResponse{
+            Success: false,
+            Error:   err.Error(),
+        }, nil
+    }
+
+    // успех
+    return &client.RegisterResponse{
+        Success: true,
+        Error:   "",
     }, nil
 }

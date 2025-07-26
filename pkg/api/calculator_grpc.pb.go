@@ -31,20 +31,20 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// ================== Основной сервис ==================
+// ================== ОСНОВНОЙ СЕРВИС ==================
 type CalculatorClient interface {
 	// Вычислить выражение
 	Calculate(ctx context.Context, in *CalculateRequest, opts ...grpc.CallOption) (*CalculateResponse, error)
-	// Получить результат по ID (через тело)
+	// Получить результат — через ТЕЛО, как ты любишь
 	GetResult(ctx context.Context, in *GetResultRequest, opts ...grpc.CallOption) (*GetResultResponse, error)
-	// Получить все примеры пользователя
+	// Получить все примеры — через тело
 	GetAllExamples(ctx context.Context, in *GetAllExamplesRequest, opts ...grpc.CallOption) (*GetAllExamplesResponse, error)
-	// Получить пошаговый отчёт вычисления (через тело!)
+	// Получить трассировку — через тело
 	GetCalculationTrace(ctx context.Context, in *GetCalculationTraceRequest, opts ...grpc.CallOption) (*GetCalculationTraceResponse, error)
-	// Регистрация
-	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error)
-	// Авторизация
-	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	// Регистрация — через тело
+	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
+	// Логин — через тело
+	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 }
 
 type calculatorClient struct {
@@ -95,9 +95,9 @@ func (c *calculatorClient) GetCalculationTrace(ctx context.Context, in *GetCalcu
 	return out, nil
 }
 
-func (c *calculatorClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+func (c *calculatorClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AuthResponse)
+	out := new(RegisterResponse)
 	err := c.cc.Invoke(ctx, Calculator_Register_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -105,9 +105,9 @@ func (c *calculatorClient) Register(ctx context.Context, in *RegisterRequest, op
 	return out, nil
 }
 
-func (c *calculatorClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+func (c *calculatorClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AuthResponse)
+	out := new(LoginResponse)
 	err := c.cc.Invoke(ctx, Calculator_Login_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -119,20 +119,20 @@ func (c *calculatorClient) Login(ctx context.Context, in *LoginRequest, opts ...
 // All implementations must embed UnimplementedCalculatorServer
 // for forward compatibility.
 //
-// ================== Основной сервис ==================
+// ================== ОСНОВНОЙ СЕРВИС ==================
 type CalculatorServer interface {
 	// Вычислить выражение
 	Calculate(context.Context, *CalculateRequest) (*CalculateResponse, error)
-	// Получить результат по ID (через тело)
+	// Получить результат — через ТЕЛО, как ты любишь
 	GetResult(context.Context, *GetResultRequest) (*GetResultResponse, error)
-	// Получить все примеры пользователя
+	// Получить все примеры — через тело
 	GetAllExamples(context.Context, *GetAllExamplesRequest) (*GetAllExamplesResponse, error)
-	// Получить пошаговый отчёт вычисления (через тело!)
+	// Получить трассировку — через тело
 	GetCalculationTrace(context.Context, *GetCalculationTraceRequest) (*GetCalculationTraceResponse, error)
-	// Регистрация
-	Register(context.Context, *RegisterRequest) (*AuthResponse, error)
-	// Авторизация
-	Login(context.Context, *LoginRequest) (*AuthResponse, error)
+	// Регистрация — через тело
+	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
+	// Логин — через тело
+	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	mustEmbedUnimplementedCalculatorServer()
 }
 
@@ -155,10 +155,10 @@ func (UnimplementedCalculatorServer) GetAllExamples(context.Context, *GetAllExam
 func (UnimplementedCalculatorServer) GetCalculationTrace(context.Context, *GetCalculationTraceRequest) (*GetCalculationTraceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCalculationTrace not implemented")
 }
-func (UnimplementedCalculatorServer) Register(context.Context, *RegisterRequest) (*AuthResponse, error) {
+func (UnimplementedCalculatorServer) Register(context.Context, *RegisterRequest) (*RegisterResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
 }
-func (UnimplementedCalculatorServer) Login(context.Context, *LoginRequest) (*AuthResponse, error) {
+func (UnimplementedCalculatorServer) Login(context.Context, *LoginRequest) (*LoginResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Login not implemented")
 }
 func (UnimplementedCalculatorServer) mustEmbedUnimplementedCalculatorServer() {}
