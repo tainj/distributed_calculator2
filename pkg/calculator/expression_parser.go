@@ -1,13 +1,13 @@
 package calculator
 
 import (
-	"fmt"
-	"strings"
-	"unicode"
+    "fmt"
+    "strings"
+    "unicode"
 
-	"github.com/Knetic/govaluate"
-	"github.com/google/uuid"
-	"github.com/tainj/distributed_calculator2/internal/models"
+    "github.com/Knetic/govaluate"
+    "github.com/google/uuid"
+    "github.com/tainj/distributed_calculator2/internal/models"
 )
 
 var (
@@ -21,45 +21,44 @@ var (
         "(": 6,
     }
 
-    // Операторы, которые правоассоциативны
+    // Правоассоциативные операторы
     RightAssociative = map[string]bool{
-        "^": true, // степень: 2^3^4 = 2^(3^4)
-        // "~": true, // унарный минус — можно добавить, но он обрабатывается отдельно
+        "^": true, // 2^3^4 = 2^(3^4)
     }
 )
 
 func NewExample(num1, num2, sign string) (models.Task, string) {
-	variable := uuid.New().String()  // генерируем имя переменной, куда будет сохранен результат
-	return models.Task{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
+    variable := uuid.New().String()  // генерируем имя переменной, куда будет сохранен результат
+    return models.Task{Num1: num1, Num2: num2, Sign: sign, Variable: variable}, variable
 }
 
 // реализация стека и его методов
 type Stack struct {
-	list []string
+    list []string
 }
 
 func NewStack() *Stack {
-	return &Stack{list: make([]string, 0)}
+    return &Stack{list: make([]string, 0)}
 }
 
 func (s *Stack) Push(item string) {
-	s.list = append(s.list, item)
+    s.list = append(s.list, item)
 }
 
 func (s *Stack) IsEmptyStack() bool {
-	return len(s.list) == 0
+    return len(s.list) == 0
 }
 
 func (s *Stack) Pop() string {
-	index := len(s.list) - 1
-	result := s.list[index]
-	s.list = s.list[:index]
-	return result
+    index := len(s.list) - 1
+    result := s.list[index]
+    s.list = s.list[:index]
+    return result
 }
 
 func (s *Stack) Peek() string {
-	index := len(s.list) - 1
-	return s.list[index]
+    index := len(s.list) - 1
+    return s.list[index]
 }
 
 type Expression struct {
@@ -68,12 +67,12 @@ type Expression struct {
 }
 
 func NewExpression(str string) *Expression {
-	return &Expression{Infix: str}
+    return &Expression{Infix: str}
 }
 
 func (s *Expression) Check() bool {  // проверяется выражение на то, является ли оно корректным
-	_, err := govaluate.NewEvaluableExpression(s.Infix)
-	return err == nil
+    _, err := govaluate.NewEvaluableExpression(s.Infix)
+    return err == nil
 }
 
 func (s *Expression) Convert() (bool, error) {
@@ -85,7 +84,6 @@ func (s *Expression) Convert() (bool, error) {
     stack := NewStack()
     example := strings.ReplaceAll(s.Infix, " ", "") // удаляем пробелы
     number := make([]rune, 0)
-
     for _, i := range example {
         sign := string(i)
         if unicode.IsDigit(i) { // проверяем является ли символ цифрой
@@ -99,7 +97,6 @@ func (s *Expression) Convert() (bool, error) {
                 number = make([]rune, 0)
             }
         } 
-
         if value, isOperator := OperatorPriority[sign]; isOperator {
             // обрабатываем операторы: +, -, *, /, ^, ~, (
             // выталкиваем из стека операторы с большим или равным приоритетом
@@ -112,7 +109,6 @@ func (s *Expression) Convert() (bool, error) {
 
                 topPriority := OperatorPriority[top]
 
-                // если приоритет верхнего больше текущего — выталкиваем
                 if topPriority > value {
                     list = append(list, stack.Pop())
                 } else if topPriority == value {
@@ -147,12 +143,12 @@ func (s *Expression) Convert() (bool, error) {
 }
 
 func (s *Expression) Calculate() ([]models.Task, string) {
-	results := make([]models.Task, 0)
-	expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
-	for len(expression) != 1 {
-		for index, sign := range expression {
-			if _, isOperator := OperatorPriority[sign]; isOperator {
-				var num1, num2 string
+    results := make([]models.Task, 0)
+    expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
+    for len(expression) != 1 {
+        for index, sign := range expression {
+            if _, isOperator := OperatorPriority[sign]; isOperator {
+                var num1, num2 string
                 var newExpr []string
                 if sign == "~" {
                     // унарный минус: ~X → 0 - X
@@ -164,7 +160,7 @@ func (s *Expression) Calculate() ([]models.Task, string) {
                     sign := "-" // всегда вычитание
                     result, variable := NewExample(num1, num2, sign)
                     results = append(results, result)
-                    newExpr = replaceExpr(expression, index, variable)
+                    newExpr = replaceUnary(expression, index, variable)
                 } else {
                     // Бинарный оператор: +, -, *, /, ^
                     if index < 2 {
@@ -174,35 +170,37 @@ func (s *Expression) Calculate() ([]models.Task, string) {
                     num2 = expression[index-1]
                     result, variable := NewExample(num1, num2, sign)
                     results = append(results, result)
-                    newExpr = replaceExpr(expression, index, variable)
+                    newExpr = replaceBinary(expression, index, variable)
                 }
 
                 expression = newExpr
                 break
-			}
-		}
-	}
-	return results, expression[0]
+            }
+        }
+    }
+    return results, expression[0]
 }
 
-func replaceExpr(expr []string, opIndex int, varName string) []string {
-    // определяем границы для вырезания
-    start := opIndex - 2
-    if start < 0 {
-        start = 0 // чтоб не уйти в минус
-    }
-
+func replaceUnary(expr []string, opIndex int, varName string) []string {
+    start := opIndex - 1
     end := opIndex + 1
-    if end > len(expr) {
-        end = len(expr) // чтоб не выйти за пределы
+    if start < 0 {
+        start = 0
     }
-
-    // собираем новый слайс
-    newExpr := make([]string, 0, len(expr)-2)
-    newExpr = append(newExpr, expr[:start]...) // всё до оператора
-    newExpr = append(newExpr, varName)         // наша переменная
-    newExpr = append(newExpr, expr[end:]...)   // всё после оператора
-
-    return newExpr
+    if end > len(expr) {
+        end = len(expr)
+    }
+    return append(append(append([]string{}, expr[:start]...), varName), expr[end:]...)
 }
 
+func replaceBinary(expr []string, opIndex int, varName string) []string {
+    start := opIndex - 2
+    end := opIndex + 1
+    if start < 0 {
+        start = 0
+    }
+    if end > len(expr) {
+        end = len(expr)
+    }
+    return append(append(append([]string{}, expr[:start]...), varName), expr[end:]...)
+}
