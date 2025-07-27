@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"errors"
+	"math"
 )
 
 var (
@@ -38,6 +39,7 @@ func (n *Node) Calculate() (float64, error) {
             return 0, ErrDivisionByZero
         }
         return n.Num1 / n.Num2, nil
+    case "^": return math.Pow(n.Num1, n.Num2), nil
     default:
         return 0, ErrNonExistingOperation
     }

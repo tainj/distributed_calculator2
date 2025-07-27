@@ -11,15 +11,21 @@ import (
 )
 
 var (
-	OperatorPriority = map[string]int{
-		"+": 1,
-		"-": 1,
-		"*": 2,
-		"/": 2,
-		"^": 3,
-		"~": 4,
-		"(": 6,
-	}
+    OperatorPriority = map[string]int{
+        "+": 1,
+        "-": 1,
+        "*": 2,
+        "/": 2,
+        "^": 3,
+        "~": 4,
+        "(": 6,
+    }
+
+    // Операторы, которые правоассоциативны
+    RightAssociative = map[string]bool{
+        "^": true, // степень: 2^3^4 = 2^(3^4)
+        // "~": true, // унарный минус — можно добавить, но он обрабатывается отдельно
+    }
 )
 
 func NewExample(num1, num2, sign string) (models.Task, string) {
@@ -71,53 +77,73 @@ func (s *Expression) Check() bool {  // проверяется выражени�
 }
 
 func (s *Expression) Convert() (bool, error) {
-	if !s.Check() {
-		return false, fmt.Errorf("line is not a mathematical expression or contains an error")
-	}
-	// инициализация списка, стека и списка для чисел
-	list := make([]string, 0)
-	stack := NewStack()
-	example := strings.ReplaceAll(s.Infix, " ", "") // удаляем пробелы
-	number := make([]rune, 0)
-	for _, i := range example {
-		sign := string(i)
-		if unicode.IsDigit(i) { // проверяем является ли символ цифрой
-			number = append(number, i) // добавляем в список для чисел
-			continue
-		} else if sign == "." {
-			number = append(number, rune(sign[0]))
-		} else {
-			if len(number) != 0 {
-				list = append(list, string(number)) // если это не цифра, то добавляем всю строку в список
-				number = make([]rune, 0)
-			}
-		}
-		if value, isOperator := OperatorPriority[sign]; isOperator {
-			for !stack.IsEmptyStack() {
-				top := stack.Peek()
-				if top != "(" && OperatorPriority[top] >= value {
-					list = append(list, stack.Pop()) // извлекаем оператор из стека
-				} else {
-					break
-				}
-			}
-			stack.Push(sign) // добавляем текущий оператор в стек
-		}
-		if i == ')' { // извлекаем операторы из стека 
-			for stack.Peek() != "(" {
-				list = append(list, stack.Pop())
-			}
-			stack.Pop()
-		}
-	}
-	if len(number) > 0 {
-		list = append(list, string(number)) // добавляем последние число, если имеется
-	}
-	for !stack.IsEmptyStack() {
-		list = append(list, stack.Pop())
-	}
-	s.Postfix = strings.Join(list, " ")
-	return true, nil
+    if !s.Check() {
+        return false, fmt.Errorf("line is not a mathematical expression or contains an error")
+    }
+    // инициализация списка, стека и списка для чисел
+    list := make([]string, 0)
+    stack := NewStack()
+    example := strings.ReplaceAll(s.Infix, " ", "") // удаляем пробелы
+    number := make([]rune, 0)
+
+    for _, i := range example {
+        sign := string(i)
+        if unicode.IsDigit(i) { // проверяем является ли символ цифрой
+            number = append(number, i) // добавляем в список для чисел
+            continue
+        } else if sign == "." {
+            number = append(number, rune(sign[0]))
+        } else {
+            if len(number) != 0 {
+                list = append(list, string(number)) // если это не цифра, то добавляем всю строку в список
+                number = make([]rune, 0)
+            }
+        } 
+
+        if value, isOperator := OperatorPriority[sign]; isOperator {
+            // обрабатываем операторы: +, -, *, /, ^, ~, (
+            // выталкиваем из стека операторы с большим или равным приоритетом
+            // НО: если оператор правоассоциативный (например, ^), то при равном приоритете — НЕ выталкиваем
+            for !stack.IsEmptyStack() {
+                top := stack.Peek()
+                if top == "(" {
+                    break
+                }
+
+                topPriority := OperatorPriority[top]
+
+                // если приоритет верхнего больше текущего — выталкиваем
+                if topPriority > value {
+                    list = append(list, stack.Pop())
+                } else if topPriority == value {
+                    // если приоритет равен
+                    // смотрим ассоциативность: если левоассоциативный — выталкиваем, если право — нет
+                    if !RightAssociative[sign] {
+                        list = append(list, stack.Pop())
+                    } else {
+                        break
+                    }
+                } else {
+                    break
+                }
+            }
+            stack.Push(sign) // добавляем текущий оператор в стек
+        }
+        if i == ')' { // извлекаем операторы из стека 
+            for stack.Peek() != "(" {
+                list = append(list, stack.Pop())
+            }
+            stack.Pop() // удаляем "("
+        }
+    }
+    if len(number) > 0 {
+        list = append(list, string(number)) // добавляем последние число, если имеется
+    }
+    for !stack.IsEmptyStack() {
+        list = append(list, stack.Pop()) // выгружаем остаток стека
+    }
+    s.Postfix = strings.Join(list, " ")
+    return true, nil
 }
 
 func (s *Expression) Calculate() ([]models.Task, string) {
@@ -126,14 +152,33 @@ func (s *Expression) Calculate() ([]models.Task, string) {
 	for len(expression) != 1 {
 		for index, sign := range expression {
 			if _, isOperator := OperatorPriority[sign]; isOperator {
-				example := expression[index - 2:index + 1]  // получаем два числа и оператор
-				num1 := example[0]
-				num2 := example[1]
-				sign := example[2]
-				result, variable := NewExample(num1, num2, sign)  // формируем пример
-				results = append(results, result)
-				expression = replaceExpr(expression, index, variable)
-				break
+				var num1, num2 string
+                var newExpr []string
+                if sign == "~" {
+                    // унарный минус: ~X → 0 - X
+                    if index < 1 {
+                        return nil, "" // ошибка: нет операнда
+                    }
+                    num1 = "0"
+                    num2 = expression[index-1]
+                    sign := "-" // всегда вычитание
+                    result, variable := NewExample(num1, num2, sign)
+                    results = append(results, result)
+                    newExpr = replaceExpr(expression, index, variable)
+                } else {
+                    // Бинарный оператор: +, -, *, /, ^
+                    if index < 2 {
+                        return nil, "" // ошибка: мало операндов
+                    }
+                    num1 = expression[index-2]
+                    num2 = expression[index-1]
+                    result, variable := NewExample(num1, num2, sign)
+                    results = append(results, result)
+                    newExpr = replaceExpr(expression, index, variable)
+                }
+
+                expression = newExpr
+                break
 			}
 		}
 	}
