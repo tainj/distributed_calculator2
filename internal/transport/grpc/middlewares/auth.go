@@ -6,7 +6,7 @@ import (
 	"github.com/tainj/distributed_calculator2/internal/auth"
 )
 
-func AuthMiddleware(jwtService *auth.JWTService) Middleware {
+func AuthMiddleware(jwtService auth.JWTService) Middleware {
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             // Список путей, где не нужна аутентификация

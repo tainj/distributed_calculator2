@@ -1,16 +1,17 @@
 package service
 
 import (
-    "context"
-    "fmt"
-    "time"
+	"context"
+	"errors"
+	"fmt"
+	"time"
 
-    "github.com/google/uuid"
-    "github.com/tainj/distributed_calculator2/internal/auth"
-    "github.com/tainj/distributed_calculator2/internal/models"
-    repo "github.com/tainj/distributed_calculator2/internal/repository"
-    "github.com/tainj/distributed_calculator2/pkg/calculator"
-    "github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
+	"github.com/google/uuid"
+	"github.com/tainj/distributed_calculator2/internal/auth"
+	"github.com/tainj/distributed_calculator2/internal/models"
+	repo "github.com/tainj/distributed_calculator2/internal/repository"
+	"github.com/tainj/distributed_calculator2/pkg/calculator"
+	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
 // calculator service — orchestrator
@@ -19,14 +20,16 @@ type CalculatorService struct {
     userRepo     repo.UserRepository
     repoExamples repo.ExampleRepository
     kafkaQueue   kafka.TaskQueue
+    jwtService   auth.JWTService
 }
 
 // newcalculator service
-func NewCalculatorService(userRepo repo.UserRepository, kafkaQueue kafka.TaskQueue, repoExample repo.ExampleRepository) *CalculatorService {
+func NewCalculatorService(userRepo repo.UserRepository, kafkaQueue kafka.TaskQueue, repoExample repo.ExampleRepository, jwtService   auth.JWTService) *CalculatorService {
     return &CalculatorService{
         kafkaQueue:   kafkaQueue,
         repoExamples: repoExample,
 		userRepo: userRepo,
+        jwtService: jwtService,
     }
 }
 
@@ -53,6 +56,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
     example = &models.Example{
         Id:             exampleID,
         Expression:     example.Expression,
+        UserID:         example.UserID,
         SimpleExamples: results,
         Response:       variable,
     }
@@ -89,22 +93,22 @@ func (s *CalculatorService) GetResult(ctx context.Context, exampleID string) (fl
 }
 
 // register — регистрирует нового пользователя
-func (s *CalculatorService) Register(ctx context.Context, user *models.UserCredentials) (*models.User, error) {
+func (s *CalculatorService) Register(ctx context.Context, userRequest *models.UserCredentials) (*models.User, error) {
     // проверяем, есть ли уже с такой почтой
-    if _, err := s.userRepo.GetByEmail(ctx, user.Email); err == nil {
+    if _, err := s.userRepo.GetByEmail(ctx, userRequest.Email); err == nil {
         return nil, fmt.Errorf("email already exists")
     }
 
     // хэшируем пароль
-    hashedPassword, err := auth.HashPassword(user.Password)
+    hashedPassword, err := auth.HashPassword(userRequest.Password)
     if err != nil {
         return nil, err
     }
 
     // создаём нового пользователя
-    newUser := &models.User{
+    user := &models.User{
         ID:           uuid.New().String(),
-        Email:        user.Email,
+        Email:        userRequest.Email,
         PasswordHash: hashedPassword,
         Role:         models.UserRole,
         CreatedAt:    time.Now(),
@@ -112,9 +116,33 @@ func (s *CalculatorService) Register(ctx context.Context, user *models.UserCrede
     }
 
     // сохраняем
-    if err := s.userRepo.Register(ctx, newUser); err != nil {
+    if err := s.userRepo.Register(ctx, user); err != nil {
         return nil, err
     }
 
-    return newUser, nil
+    return user, nil
+}
+
+func (s *CalculatorService) Login(ctx context.Context, userRequest *models.UserCredentials) (*models.LoginResponse, error) {
+    user, err := s.userRepo.GetByEmail(ctx, userRequest.Email)
+    if err != nil {
+        return nil, errors.New("invalid credentials")
+    }
+
+    if !auth.CheckPassword(userRequest.Password, user.PasswordHash) {
+        return nil, errors.New("invalid credentials")
+    }
+
+    // генерируем JWT
+    token, err := s.jwtService.GenerateToken(user.ID)
+    if err != nil {
+        return nil, err
+    }
+
+    // возвращаем ответ
+    return &models.LoginResponse{
+        UserID: user.ID,
+        Email:  user.Email,
+        Token:  token,
+    }, nil
 }

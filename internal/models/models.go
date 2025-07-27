@@ -15,6 +15,7 @@ type Example struct {
 	Id             string `json:"id"`
 	Expression     string `json:"expression"`
 	SimpleExamples []Task `json:"simple_examples"`
+	UserID         string `json:"user_id""`
 	Response       string `json:"response"`
 }
 
@@ -60,7 +61,15 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// для регистрации и авторизации пользователя
+
 type UserCredentials struct {
     Email    string `json:"email"`
     Password string `json:"password"`
+}
+
+type LoginResponse struct {
+    UserID string `json:"user_id"`
+    Email  string `json:"email"`
+    Token  string `json:"token"`
 }

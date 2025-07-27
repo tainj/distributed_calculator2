@@ -75,7 +75,7 @@ func main() {
 	userRepo := factory.CreateUserRepository()
 
     // 8. сервис калькулятора
-    srv := service.NewCalculatorService(userRepo, kafkaQueue, exampleRepo)
+    srv := service.NewCalculatorService(userRepo, kafkaQueue, exampleRepo, jwtService)
 
     // 9. воркер — обрабатывает задачи из kafka
     worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider)

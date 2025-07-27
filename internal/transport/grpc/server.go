@@ -28,7 +28,7 @@ type Server struct {
 func New(ctx context.Context, 
     port, restPort int, 
     service handlers.Service,
-    jwtService *auth.JWTService,) (*Server, error) {
+    jwtService auth.JWTService,) (*Server, error) {
     // слушаем порт для gRPC
     lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
     if err != nil {

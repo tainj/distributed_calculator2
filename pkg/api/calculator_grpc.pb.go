@@ -35,7 +35,7 @@ const (
 type CalculatorClient interface {
 	// Вычислить выражение
 	Calculate(ctx context.Context, in *CalculateRequest, opts ...grpc.CallOption) (*CalculateResponse, error)
-	// Получить результат — через ТЕЛО, как ты любишь
+	// Получить результат — через ТЕЛО
 	GetResult(ctx context.Context, in *GetResultRequest, opts ...grpc.CallOption) (*GetResultResponse, error)
 	// Получить все примеры — через тело
 	GetAllExamples(ctx context.Context, in *GetAllExamplesRequest, opts ...grpc.CallOption) (*GetAllExamplesResponse, error)
@@ -123,7 +123,7 @@ func (c *calculatorClient) Login(ctx context.Context, in *LoginRequest, opts ...
 type CalculatorServer interface {
 	// Вычислить выражение
 	Calculate(context.Context, *CalculateRequest) (*CalculateResponse, error)
-	// Получить результат — через ТЕЛО, как ты любишь
+	// Получить результат — через ТЕЛО
 	GetResult(context.Context, *GetResultRequest) (*GetResultResponse, error)
 	// Получить все примеры — через тело
 	GetAllExamples(context.Context, *GetAllExamplesRequest) (*GetAllExamplesResponse, error)

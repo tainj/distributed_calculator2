@@ -39,36 +39,6 @@ func (r *AuthUserRepository) Register(ctx context.Context, user *models.User) er
     return nil
 }
 
-func (r *AuthUserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
-    // запрашиваем пользователя по username
-    query := sq.Select("id", "username", "email", "password_hash", "role", "created_at", "updated_at").
-        From("users").
-        Where(sq.Eq{"username": username}).
-        PlaceholderFormat(sq.Dollar)
-
-    // генерируем sql
-    sql, args, err := query.ToSql()
-    if err != nil {
-        return nil, fmt.Errorf("failed to build query: %w", err)
-    }
-
-    var user models.User
-    // сканируем данные
-    err = r.db.Db.QueryRowContext(ctx, sql, args...).Scan(
-        &user.ID,
-        &user.Email,
-        &user.PasswordHash,
-        &user.Role,
-        &user.CreatedAt,
-        &user.UpdatedAt,
-    )
-    if err != nil {
-        return nil, fmt.Errorf("failed to get user by username: %w", err)
-    }
-
-    return &user, nil
-}
-
 func (r *AuthUserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
     // ищем пользователя по email
     query := sq.Select("id", "email", "password_hash", "role", "created_at", "updated_at").

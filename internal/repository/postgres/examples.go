@@ -23,7 +23,7 @@ func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *mod
     // формируем запрос для сохранения примера в бд
     query := sq.Insert("examples").
         Columns("id", "expression", "response", "user_id", "calculated").
-        Values(example.Id, example.Expression, example.Response, "1", false).
+        Values(example.Id, example.Expression, example.Response, example.UserID, false).
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)
 
@@ -54,28 +54,51 @@ func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId 
     return nil
 }
 
+func (r *PostgresResultRepository) UpdateExampleWithError(ctx context.Context, exampleID, errorMsg string) error {
+    query := sq.Update("examples").
+        Set("calculated", true).
+        Set("error", errorMsg).
+        Where(sq.Eq{"id": exampleID}).
+        PlaceholderFormat(sq.Dollar).
+        RunWith(r.db.Db)
+
+    _, err := query.ExecContext(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to update example with error: %w", err)
+    }
+    return nil
+}
+
 func (r *PostgresResultRepository) GetResult(ctx context.Context, exampleID string) (float64, error) {
-    // запрашиваем результат по id
-    query := sq.Select("result").
+    var calculated bool
+    var result sql.NullFloat64
+    var dbError sql.NullString
+
+    query := sq.Select("calculated", "result", "error").
         From("examples").
         Where(sq.Eq{"id": exampleID}).
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)
 
-    var example models.UserExample
-    // сканируем результат
-    err := query.QueryRowContext(ctx).Scan(
-        &example.Result,
-    )
+    err := query.QueryRowContext(ctx).Scan(&calculated, &result, &dbError)
     if err != nil {
-        // если нет строки — ошибка not found
         if errors.Is(err, sql.ErrNoRows) {
-            return 0, fmt.Errorf("repository.GetResult: example not found")
+            return 0, fmt.Errorf("example not found")
         }
-        // любая другая ошибка бд
-        return 0, fmt.Errorf("repository.GetResult: failed to get example: %w", err)
+        return 0, fmt.Errorf("failed to query: %w", err)
     }
 
-    // разыменовываем указатель на результат
-    return *example.Result, nil
+    if !calculated {
+        return 0, fmt.Errorf("calculation not completed yet")
+    }
+
+    if dbError.Valid {
+        return 0, fmt.Errorf("calculation failed: %s", dbError.String)
+    }
+
+    if !result.Valid {
+        return 0, fmt.Errorf("result is not available")
+    }
+
+    return result.Float64, nil
 }

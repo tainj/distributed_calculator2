@@ -16,7 +16,7 @@ service Calculator {
     };
   }
 
-  // Получить результат — через ТЕЛО, как ты любишь
+  // Получить результат — через ТЕЛО
   rpc GetResult(GetResultRequest) returns (GetResultResponse) {
     option (google.api.http) = {
       post: "/v1/result"
@@ -67,7 +67,6 @@ message CalculateResponse {
   string task_id = 1;
 }
 
-// 🔥 ВАЖНО: task_id — в теле, не в URL, не в query, НИГДЕ ЕЩЁ
 message GetResultRequest {
   string task_id = 1;
 }
@@ -79,9 +78,7 @@ message GetResultResponse {
   }
 }
 
-message GetAllExamplesRequest {
-  // Пусто — но можно расширить
-}
+message GetAllExamplesRequest {}
 
 message GetAllExamplesResponse {
   repeated Example examples = 1;
@@ -96,7 +93,7 @@ message Example {
 }
 
 message GetCalculationTraceRequest {
-  string task_id = 1;  // 🔥 ОПЯТЬ В ТЕЛЕ
+  string task_id = 1;
 }
 
 message GetCalculationTraceResponse {
@@ -124,6 +121,5 @@ message LoginResponse {
   bool success = 1;
   string token = 2;
   string user_id = 3;
-  string username = 4;
-  string error = 5;
+  string error = 4;
 }

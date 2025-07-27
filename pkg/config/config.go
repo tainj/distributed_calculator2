@@ -48,7 +48,7 @@ func LoadConfig() (*Config, error) {
         return nil, err
     }
 
-    if err := env.Parse(&cfg.Kafka); err != nil {
+    if err := env.Parse(&cfg.JWT); err != nil {
         return nil, err
     }
     

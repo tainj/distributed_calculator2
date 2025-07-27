@@ -1,11 +1,13 @@
 package handlers
 
 import (
-    "context"
-    "fmt"
-    "github.com/AlekSi/pointer"
-    "github.com/tainj/distributed_calculator2/internal/models"
-    client "github.com/tainj/distributed_calculator2/pkg/api"
+	"context"
+	"fmt"
+
+	"github.com/AlekSi/pointer"
+	"github.com/tainj/distributed_calculator2/internal/auth"
+	"github.com/tainj/distributed_calculator2/internal/models"
+	client "github.com/tainj/distributed_calculator2/pkg/api"
 )
 
 // Service — интерфейс бизнес-логики
@@ -14,6 +16,7 @@ type Service interface {
     Calculate(ctx context.Context, example *models.Example) (*models.Example, error)
     GetResult(ctx context.Context, exampleID string) (float64, error)
     Register(ctx context.Context, user *models.UserCredentials) (*models.User, error)
+    Login(ctx context.Context, user *models.UserCredentials) (*models.LoginResponse, error)
 }
 
 // CalculatorService — gRPC сервер
@@ -32,6 +35,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, req *client.Calculate
     // вызываем бизнес-логику
     resp, err := s.service.Calculate(ctx, &models.Example{
         Expression: req.GetExpression(),
+        UserID: auth.UserIDFromCtx(ctx),
     })
     if err != nil {
         return nil, fmt.Errorf("Calculate: %w", err)
@@ -71,8 +75,8 @@ func (s *CalculatorService) GetResult(ctx context.Context, req *client.GetResult
 func (s *CalculatorService) Register(ctx context.Context, req *client.RegisterRequest) (*client.RegisterResponse, error) {
     // передаём креды в сервис
     _, err := s.service.Register(ctx, &models.UserCredentials{
-        Email:    req.GetEmail(),    // ✅ email
-        Password: req.GetPassword(), // ✅ исправлено: не GetEmail!
+        Email:    req.GetEmail(),
+        Password: req.GetPassword(),
     })
     if err != nil {
         // возвращаем ошибку в теле, не как gRPC error
@@ -85,6 +89,29 @@ func (s *CalculatorService) Register(ctx context.Context, req *client.RegisterRe
     // успех
     return &client.RegisterResponse{
         Success: true,
+        Error:   "",
+    }, nil
+}
+
+func (s *CalculatorService) Login(ctx context.Context, req *client.LoginRequest) (*client.LoginResponse, error) {
+    // передаём креды в сервис
+    loginResponse, err := s.service.Login(ctx, &models.UserCredentials{
+        Email:    req.GetEmail(),
+        Password: req.GetPassword(),
+    })
+    if err != nil {
+        // возвращаем ошибку в теле, не как gRPC error
+        return &client.LoginResponse{
+            Success: false,
+            Error:   err.Error(),
+        }, nil
+    }
+
+    // успех
+    return &client.LoginResponse{
+        Success: true,
+        Token: loginResponse.Token,
+        UserId: loginResponse.UserID,
         Error:   "",
     }, nil
 }

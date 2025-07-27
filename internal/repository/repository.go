@@ -13,13 +13,13 @@ type VariableRepository interface {
 type ExampleRepository interface {
     SaveExample(ctx context.Context, example *models.Example) error
     UpdateExample(ctx context.Context, exampleId string, result float64) error
+    UpdateExampleWithError(ctx context.Context, exampleID, errorMsg string) error
     GetResult(ctx context.Context, exampleID string) (float64, error)
     // GetExamples(ctx context.Context, userID string) ([]models.Example, error)
 }
 
 type UserRepository interface {
     Register(ctx context.Context, user *models.User) error
-    GetByUsername(ctx context.Context, username string) (*models.User, error)
     GetByEmail(ctx context.Context, email string) (*models.User, error)
     GetByID(ctx context.Context, id string) (*models.User, error)
 }

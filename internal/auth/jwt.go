@@ -10,20 +10,25 @@ import (
 )
 
 type Config struct {
-    SecretKey      string
-    ExpireDuration time.Duration
-    Issuer         string
+    SecretKey      string        `env:"JWT_SECRET_KEY" default:"my-super-secret-key-change-in-production"`
+    ExpireDuration time.Duration `env:"JWT_EXPIRE_HOURS" default:"24h"`
+    Issuer         string        `env:"JWT_ISSUER" default:"calculator-service"`
 }
 
-type JWTService struct {
+type JWTService interface {
+    GenerateToken(userID string) (string, error)
+    ParseToken(tokenStr string) (*Claims, error)
+}
+
+type jwtService struct {
     config Config
 }
 
-func NewJWTService(config Config) *JWTService {
-    return &JWTService{config: config}
+func NewJWTService(config Config) *jwtService {
+    return &jwtService{config: config}
 }
 
-func (s *JWTService) GenerateToken(userID string) (string, error) {
+func (s *jwtService) GenerateToken(userID string) (string, error) {
     if _, err := uuid.Parse(userID); err != nil {
         return "", errors.New("invalid user ID")
     }
@@ -40,7 +45,7 @@ func (s *JWTService) GenerateToken(userID string) (string, error) {
     return token.SignedString([]byte(s.config.SecretKey))
 }
 
-func (s *JWTService) ParseToken(tokenStr string) (*Claims, error) {
+func (s *jwtService) ParseToken(tokenStr string) (*Claims, error) {
     claims := &Claims{}
     token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
         if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
