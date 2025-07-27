@@ -102,3 +102,57 @@ func (r *PostgresResultRepository) GetResult(ctx context.Context, exampleID stri
 
     return result.Float64, nil
 }
+
+func (r *PostgresResultRepository) GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error) {
+    // строим запрос через squirrel
+    query := sq.Select("id", "expression", "calculated", "result", "error", "created_at").
+        From("examples").
+        Where(sq.Eq{"user_id": userID}).
+        OrderBy("created_at DESC").
+        PlaceholderFormat(sq.Dollar)
+
+    // выполняем
+    rows, err := query.RunWith(r.db.Db).QueryContext(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to query examples: %w", err)
+    }
+    defer rows.Close()
+
+    var examples []models.UserExample
+    for rows.Next() {
+        var example models.UserExample
+        var result sql.NullFloat64
+        var dbError sql.NullString
+
+        err := rows.Scan(
+            &example.ID,
+            &example.Expression,
+            &example.Calculated,
+            &result,
+            &dbError,
+            &example.CreatedAt,
+        )
+        if err != nil {
+            return nil, fmt.Errorf("failed to scan row: %w", err)
+        }
+
+        // если есть результат — сохраняем
+        if result.Valid {
+            example.Result = &result.Float64
+        }
+
+        // если есть ошибка — сохраняем
+        if dbError.Valid {
+            example.Error = &dbError.String
+        }
+
+        examples = append(examples, example)
+    }
+
+    // проверяем, не было ли ошибки в rows
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("row iteration error: %w", err)
+    }
+
+    return examples, nil
+}

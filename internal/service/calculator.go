@@ -146,3 +146,7 @@ func (s *CalculatorService) Login(ctx context.Context, userRequest *models.UserC
         Token:  token,
     }, nil
 }
+
+func (s *CalculatorService) GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error) {
+    return s.repoExamples.GetExamplesByUserID(ctx, userID)
+}

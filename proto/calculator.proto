@@ -32,14 +32,6 @@ service Calculator {
     };
   }
 
-  // Получить трассировку — через тело
-  rpc GetCalculationTrace(GetCalculationTraceRequest) returns (GetCalculationTraceResponse) {
-    option (google.api.http) = {
-      post: "/v1/trace"
-      body: "*"
-    };
-  }
-
   // Регистрация — через тело
   rpc Register(RegisterRequest) returns (RegisterResponse) {
     option (google.api.http) = {
@@ -90,16 +82,6 @@ message Example {
   bool calculated = 3;
   optional double result = 4;
   string created_at = 5;
-}
-
-message GetCalculationTraceRequest {
-  string task_id = 1;
-}
-
-message GetCalculationTraceResponse {
-  string full_expression = 1;
-  repeated string steps = 2;
-  optional string error = 3;
 }
 
 message RegisterRequest {

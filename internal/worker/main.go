@@ -129,12 +129,3 @@ func (w *Worker) handleFinalTask(ctx context.Context, task models.Task, result f
     log.Printf("Final result saved: example=%s, result=%f", task.ExampleID, result)
     return nil
 }
-
-func (w * Worker) handleTaskWithError(ctx context.Context, task models.Task, err string) error {
-    if err := w.exampleRepo.UpdateExampleWithError(ctx, task.ExampleID, err); err != nil {
-        return fmt.Errorf("update example in DB: %w", err)
-    }
-
-    log.Printf("Final result saved with error: example=%s, error=%s", task.ExampleID, err)
-    return nil
-}

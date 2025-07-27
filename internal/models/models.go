@@ -12,11 +12,11 @@ const (
 // для бизнес логики
 
 type Example struct {
-	Id             string `json:"id"`
-	Expression     string `json:"expression"`
-	SimpleExamples []Task `json:"simple_examples"`
-	UserID         string `json:"user_id""`
-	Response       string `json:"response"`
+	Id             string  `json:"id"`
+	Expression     string  `json:"expression"`
+	SimpleExamples []Task  `json:"simple_examples"`
+	UserID         string  `json:"user_id""`
+	Response       string  `json:"response"`
 }
 
 type Task struct {
@@ -39,6 +39,7 @@ type UserExample struct {
 	Result     *float64 `json:"result,omitempty" db:"result"`
 	Error      *string  `json:"error,omitempty" db:"error"`
 	UserID     string   `json:"user_id" db:"user_id"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 type Step struct {

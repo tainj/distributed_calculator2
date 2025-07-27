@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
+    "time"
 
-	"github.com/AlekSi/pointer"
-	"github.com/tainj/distributed_calculator2/internal/auth"
-	"github.com/tainj/distributed_calculator2/internal/models"
-	client "github.com/tainj/distributed_calculator2/pkg/api"
+    "github.com/AlekSi/pointer"
+    "github.com/tainj/distributed_calculator2/internal/auth"
+    "github.com/tainj/distributed_calculator2/internal/models"
+    client "github.com/tainj/distributed_calculator2/pkg/api"
 )
 
 // Service — интерфейс бизнес-логики
@@ -17,6 +18,7 @@ type Service interface {
     GetResult(ctx context.Context, exampleID string) (float64, error)
     Register(ctx context.Context, user *models.UserCredentials) (*models.User, error)
     Login(ctx context.Context, user *models.UserCredentials) (*models.LoginResponse, error)
+    GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error)
 }
 
 // CalculatorService — gRPC сервер
@@ -35,7 +37,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, req *client.Calculate
     // вызываем бизнес-логику
     resp, err := s.service.Calculate(ctx, &models.Example{
         Expression: req.GetExpression(),
-        UserID: auth.UserIDFromCtx(ctx),
+        UserID: auth.UserIDFromCtx(ctx), // берём user_id из контекста
     })
     if err != nil {
         return nil, fmt.Errorf("Calculate: %w", err)
@@ -93,6 +95,7 @@ func (s *CalculatorService) Register(ctx context.Context, req *client.RegisterRe
     }, nil
 }
 
+// Login — вход пользователя
 func (s *CalculatorService) Login(ctx context.Context, req *client.LoginRequest) (*client.LoginResponse, error) {
     // передаём креды в сервис
     loginResponse, err := s.service.Login(ctx, &models.UserCredentials{
@@ -110,8 +113,37 @@ func (s *CalculatorService) Login(ctx context.Context, req *client.LoginRequest)
     // успех
     return &client.LoginResponse{
         Success: true,
-        Token: loginResponse.Token,
-        UserId: loginResponse.UserID,
+        Token:   loginResponse.Token,
+        UserId:  loginResponse.UserID,
         Error:   "",
+    }, nil
+}
+    
+// GetAllExamples — возвращает все вычисления пользователя
+func (s *CalculatorService) GetAllExamples(ctx context.Context, req *client.GetAllExamplesRequest) (*client.GetAllExamplesResponse, error) {
+    // берём user_id из контекста
+    userId := auth.UserIDFromCtx(ctx)
+
+    // получаем примеры из сервиса
+    resp, err := s.service.GetExamplesByUserID(ctx, userId)
+    if err != nil {
+        return nil, err
+    }
+
+    // преобразуем внутренние модели в gRPC
+    examples := make([]*client.Example, 0)
+    for _, example := range resp {
+        examples = append(examples, &client.Example{
+            Id:         example.ID,
+            Expression: example.Expression,
+            Calculated: example.Calculated,
+            Result:     example.Result, // может быть nil
+            CreatedAt:  example.CreatedAt.Format(time.RFC3339), // нормальный формат времени
+        })
+    }
+
+    // возвращаем список
+    return &client.GetAllExamplesResponse{
+        Examples: examples,
     }, nil
 }
