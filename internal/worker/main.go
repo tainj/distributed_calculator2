@@ -36,41 +36,59 @@ func NewWorker(
 }
 
 func (w *Worker) Start() {
-    log.Println("Worker started, reading tasks from Kafka...")
+    log.Println("worker started, reading tasks from kafka...")
     for {
         ctx := context.Background()
 
-        // Читаем сообщение
+        // читаем сообщение
         jsonData, message, err := w.kafkaQueue.ReadTask()
         if err != nil {
-            log.Printf("Failed to read task from Kafka: %v", err)
+            log.Printf("failed to read task from kafka: %v", err)
             continue
         }
 
         var task models.Task
         if err := json.Unmarshal(jsonData, &task); err != nil {
-            log.Printf("Failed to unmarshal task: %v", err)
+            log.Printf("failed to unmarshal task: %v", err)
             continue
         }
 
-        // Обрабатываем таск
+        // обрабатываем таск
         result, err := w.ProcessTask(ctx, task)
-		if err != nil {
-            log.Printf("Failed to process task %s: %v", task.Variable, err)
-            continue // ❌ не коммитим → Kafka повторит
-        }
 
-        // ✅ Коммитим только при успехе
-        if err := w.kafkaQueue.Commit(message); err != nil {
-            log.Printf("Failed to commit message: %v", err)
+        // если ошибка в выражении (деление на ноль и т.п.) — пишем в бд и коммитим
+        if err != nil && (err == calculator.ErrDivisionByZero || err == calculator.ErrCovertExample) {
+            log.Printf("business error in task %s: %v", task.Variable, err)
+            if errDB := w.exampleRepo.UpdateExampleWithError(ctx, task.ExampleID, err.Error()); errDB != nil {
+                log.Printf("failed to save error to db: %v", errDB)
+                // не коммитим — попробуем снова
+                continue
+            }
+            // сохранили ошибку — можно коммитить
+            if errCommit := w.kafkaQueue.Commit(message); errCommit != nil {
+                log.Printf("failed to commit after error: %v", errCommit)
+                continue
+            }
             continue
         }
 
-        // ✅ Проверяем, финальный ли это таск
+        // если ошибка не в выражении (redis, сеть и т.п.) — не коммитим, кавка повторит
+        if err != nil {
+            log.Printf("infra error, will retry: %v", err)
+            continue
+        }
+
+        // всё ок — коммитим
+        if err := w.kafkaQueue.Commit(message); err != nil {
+            log.Printf("failed to commit message: %v", err)
+            continue
+        }
+
+        // если это финальный таск — сохраняем результат
         if task.IsFinal {
             if err := w.handleFinalTask(ctx, task, result); err != nil {
-                log.Printf("Failed to handle final task %s: %v", task.Variable, err)
-                // ❌ Не коммитим? Нет, уже коммитили. Но можно не обновлять статус.
+                log.Printf("failed to save final result %s: %v", task.Variable, err)
+                // не критично — результат уже в редисе
             }
         }
     }
@@ -90,7 +108,7 @@ func (w *Worker) ProcessTask(ctx context.Context, task models.Task) (float64, er
     calc := calculator.NewNode(val1, val2, task.Sign)
     result, err := calc.Calculate()
     if err != nil {
-        return 0, fmt.Errorf("calculate %f %s %f: %w", val1, task.Sign, val2, err)
+        return 0, err
     }
 
     // Сохраняем в Redis
@@ -109,5 +127,14 @@ func (w *Worker) handleFinalTask(ctx context.Context, task models.Task, result f
     }
 
     log.Printf("Final result saved: example=%s, result=%f", task.ExampleID, result)
+    return nil
+}
+
+func (w * Worker) handleTaskWithError(ctx context.Context, task models.Task, err string) error {
+    if err := w.exampleRepo.UpdateExampleWithError(ctx, task.ExampleID, err); err != nil {
+        return fmt.Errorf("update example in DB: %w", err)
+    }
+
+    log.Printf("Final result saved with error: example=%s, error=%s", task.ExampleID, err)
     return nil
 }
