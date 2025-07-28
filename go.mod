@@ -29,6 +29,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/redis/go-redis/v9 v9.11.0
+	github.com/rs/cors v1.11.1
 	github.com/segmentio/kafka-go v0.4.48
 	golang.org/x/crypto v0.40.0
 	golang.org/x/net v0.41.0 // indirect

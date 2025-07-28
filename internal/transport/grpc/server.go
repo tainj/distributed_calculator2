@@ -9,6 +9,7 @@ import (
     "net/http"
 
     "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+    "github.com/rs/cors" // ДОБАВЬ ЭТО
     "github.com/tainj/distributed_calculator2/internal/auth"
     "github.com/tainj/distributed_calculator2/internal/transport/grpc/handlers"
     "github.com/tainj/distributed_calculator2/internal/transport/grpc/middlewares"
@@ -24,54 +25,73 @@ type Server struct {
     listener   net.Listener
 }
 
-// new создаёт gRPC + REST сервер с middleware
-func New(ctx context.Context, 
-    port, restPort int, 
+func New(ctx context.Context,
+    port, restPort int,
     service handlers.Service,
-    jwtService auth.JWTService,) (*Server, error) {
-    // слушаем порт для gRPC
+    jwtService auth.JWTService) (*Server, error) {
+
     lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
     if err != nil {
         log.Fatalf("failed to listen: %v", err)
     }
 
-    // настраиваем gRPC с interceptor'ами
+    // Настройка gRPC сервера
     opts := []grpc.ServerOption{
         grpc.ChainUnaryInterceptor(
-            handlers.ContextWithLogger(logger.GetLoggerFromCtx(ctx)), // логгер в контекст
+            handlers.ContextWithLogger(logger.GetLoggerFromCtx(ctx)),
         ),
     }
 
     grpcServer := grpc.NewServer(opts...)
     client.RegisterCalculatorServer(grpcServer, handlers.NewCalculatorService(service))
 
-    // создаём REST шлюз (grpc-gateway)
+    // Настройка REST шлюза (grpc-gateway)
     restSrv := runtime.NewServeMux()
     if err := client.RegisterCalculatorHandlerServer(context.Background(), restSrv, handlers.NewCalculatorService(service)); err != nil {
         return nil, err
     }
 
-    // оборачиваем в middleware: логирование, auth, etc
+    // Применяем твои middleware: логирование, auth и т.д.
     finalHandler := middlewares.Apply(restSrv,
-        middlewares.LoggerProvider("calculator-gateway"), // логгер для HTTP
-        middlewares.AuthMiddleware(jwtService),           // проверка JWT
-        middlewares.Logging(),                           // логируем запросы
+        middlewares.LoggerProvider("calculator-gateway"),
+        middlewares.AuthMiddleware(jwtService),
+        middlewares.Logging(),
     )
 
-    // создаём HTTP сервер
+    // 🔥 ДОБАВЛЯЕМ CORS В САМОЕ КОНЦО — ОБЯЗАТЕЛЬНО ПОСЛЕ ВСЕХ MIDDLEWARE
+    // Это важно: CORS должен быть ВНЕШНИМ слоем
+    corsHandler := cors.New(cors.Options{
+        AllowedOrigins: []string{
+            "http://localhost:5173", // Vite
+            "http://localhost:3000", // CRA (если будешь использовать)
+        },
+        AllowedMethods: []string{
+            "POST",
+            "GET",
+            "OPTIONS", // Обязательно!
+        },
+        AllowedHeaders: []string{
+            "*",
+        },
+        ExposedHeaders: []string{
+            "Content-Length",
+        },
+        AllowCredentials: true, // если используешь куки или Authorization
+        MaxAge:           3600, // кэширование preflight
+    }).Handler(finalHandler)
+
+    // Создаём HTTP-сервер с CORS
     httpServer := &http.Server{
-        Addr:    fmt.Sprintf(":%d", restPort), // порт для REST
-        Handler: finalHandler,                 // используем обработчик с middleware
+        Addr:    fmt.Sprintf(":%d", restPort),
+        Handler: corsHandler, // ← ВАЖНО: передаём обработчик с CORS
     }
-    
+
     return &Server{grpcServer, httpServer, lis}, nil
 }
 
-// start запускает gRPC и REST серверы
 func (s *Server) Start(ctx context.Context) error {
     eg := errgroup.Group{}
 
-    // запускаем gRPC
     eg.Go(func() error {
         slog.InfoContext(ctx, "starting gRPC server",
             "port", s.listener.Addr().(*net.TCPAddr).Port,
@@ -79,7 +99,6 @@ func (s *Server) Start(ctx context.Context) error {
         return s.grpcServer.Serve(s.listener)
     })
 
-    // запускаем REST
     eg.Go(func() error {
         slog.InfoContext(ctx, "starting REST server",
             "port", s.restServer.Addr,
@@ -90,7 +109,6 @@ func (s *Server) Start(ctx context.Context) error {
     return eg.Wait()
 }
 
-// stop останавливает серверы
 func (s *Server) Stop(ctx context.Context) error {
     s.grpcServer.GracefulStop()
     l := logger.GetLoggerFromCtx(ctx)
