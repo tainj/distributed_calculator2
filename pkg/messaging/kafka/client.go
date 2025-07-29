@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
+
 	"github.com/segmentio/kafka-go"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
 )
 
 type TaskQueue interface {
@@ -18,6 +19,7 @@ type TaskQueue interface {
 type KafkaQueue struct {
 	writer *kafka.Writer
 	reader *kafka.Reader
+	logger logger.Logger
 }
 
 type Config struct {
@@ -26,9 +28,9 @@ type Config struct {
 	TopicResults      string `env:"KAFKA_TOPIC_RESULTS" env-default:"calculator_results"`
 }
 
-func NewKafkaQueue(cfg Config) (*KafkaQueue, error) {
+func NewKafkaQueue(cfg Config, l logger.Logger) (*KafkaQueue, error) {
 	brokers := strings.Split(cfg.BootstrapServers, ",")
-	log.Printf("Initializing KafkaQueue with brokers: %v, topic: %s\n", brokers, cfg.TopicCalculations)
+	l.Info(context.Background(), "initializing KafkaQueue", "brokers", brokers, "topic", cfg.TopicCalculations)
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("no Kafka brokers specified")
 	}
@@ -44,52 +46,52 @@ func NewKafkaQueue(cfg Config) (*KafkaQueue, error) {
 			MinBytes:       1,
 			MaxBytes:       1e6,
 			CommitInterval: 0,               // коммитим вручную
-		}),
+		},),
+		logger: l,
 	}, nil
 }
 
 func (k *KafkaQueue) SendTask(task interface{}) error {
 	jsonData, err := json.Marshal(task)
 	if err != nil {
-		log.Printf("Failed to marshal task: %v\n", err)
+		k.logger.Error(context.Background(), "failed ot marshal task", "error", err)
 		return err
 	}
-	log.Printf("Sending task to Kafka: %s\n", string(jsonData))
+	k.logger.Debug(context.Background(), "send task to Kafka", "body", string(jsonData))
 	err = k.writer.WriteMessages(context.Background(), kafka.Message{
 		Value: jsonData,
 	})
 	if err != nil {
-		log.Printf("Failed to send task to Kafka: %v\n", err)
+		k.logger.Error(context.Background(), "failed to send task to Kafka", "error", err)
 		return err
 	}
-	log.Println("Task sent successfully")
+	k.logger.Debug(context.Background(), "task sent successfully")
 	return nil
 }
 
 // ReadTask возвращает данные сообщения и само сообщение для commit
 func (k *KafkaQueue) ReadTask() ([]byte, kafka.Message, error) {
-	log.Println("Reading task from Kafka...")
-
+	k.logger.Debug(context.Background(), "read task from Kafka")
 	message, err := k.reader.ReadMessage(context.Background())
 	if err != nil {
-		log.Printf("Failed to read message from Kafka: %v\n", err)
+		k.logger.Error(context.Background(), "failed to read message from Kafka", "error", err)
 		return nil, kafka.Message{}, err
 	}
 
-	log.Printf("Received message: %s (offset: %d)\n", string(message.Value), message.Offset)
+	k.logger.Debug(context.Background(), "received message", "message", string(message.Value), "offset", message.Offset)
 	return message.Value, message, nil
 }
 
 // Commit подтверждает обработку сообщения
 func (k *KafkaQueue) Commit(message kafka.Message) error {
-	log.Printf("Committing message (offset: %d)\n", message.Offset)
+	k.logger.Debug(context.Background(), "committing message", "offset", message.Offset)
 
 	err := k.reader.CommitMessages(context.Background(), message)
 	if err != nil {
-		log.Printf("Failed to commit message: %v\n", err)
+		k.logger.Error(context.Background(), "failed to commit message", "error", err)
 		return err
 	}
 
-	log.Println("Message committed successfully")
+	k.logger.Debug(context.Background(), "message committed successfully")
 	return nil
 }

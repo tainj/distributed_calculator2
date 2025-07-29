@@ -1,14 +1,14 @@
 package repository
 
 import (
-    "context"
-    "database/sql"
-    "errors"
-    "fmt"
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 
-    sq "github.com/Masterminds/squirrel"
-    "github.com/tainj/distributed_calculator2/internal/models"
-    "github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	sq "github.com/Masterminds/squirrel"
+	"github.com/tainj/distributed_calculator2/internal/models"
+	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
 )
 
 func NewPostgresResultRepository(db *postgres.DB) *PostgresResultRepository {
@@ -20,19 +20,26 @@ type PostgresResultRepository struct {
 }
 
 func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *models.Example) error {
-    // формируем запрос для сохранения примера в бд
+    calculated := example.Error != nil
+
     query := sq.Insert("examples").
-        Columns("id", "expression", "response", "user_id", "calculated").
-        Values(example.Id, example.Expression, example.Response, example.UserID, false).
+        Columns("id", "expression", "response", "user_id", "calculated", "error").
+        Values(
+            example.ID,
+            example.Expression,
+            example.Response,
+            example.UserID,
+            calculated,
+            example.Error,
+        ).
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)
 
-    // выполняем вставку, проверяем ошибки
     _, err := query.ExecContext(ctx)
     if err != nil {
         return fmt.Errorf("repository.SaveExample: failed to insert example: %w", err)
     }
-
+    
     return nil
 }
 
@@ -50,7 +57,7 @@ func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId 
     if err != nil {
         return fmt.Errorf("repository.UpdateExample: %w", err)
     }
-
+    
     return nil
 }
 
@@ -103,7 +110,7 @@ func (r *PostgresResultRepository) GetResult(ctx context.Context, exampleID stri
     return result.Float64, nil
 }
 
-func (r *PostgresResultRepository) GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error) {
+func (r *PostgresResultRepository) GetExamplesByUserID(ctx context.Context, userID string) ([]models.Example, error) {
     // строим запрос через squirrel
     query := sq.Select("id", "expression", "calculated", "result", "error", "created_at").
         From("examples").
@@ -118,9 +125,9 @@ func (r *PostgresResultRepository) GetExamplesByUserID(ctx context.Context, user
     }
     defer rows.Close()
 
-    var examples []models.UserExample
+    var examples []models.Example
     for rows.Next() {
-        var example models.UserExample
+        var example models.Example
         var result sql.NullFloat64
         var dbError sql.NullString
 

@@ -28,29 +28,36 @@ func main() {
     // базовый контекст
     ctx := context.Background()
 
-    // инициализируем логгер
+    // инициализируем логгеры
     mainLogger := logger.New(serviceName)
+
+    // Расширяем логгер для компонентов
+    kafkaLogger := mainLogger.With("component", "KafkaConsumer")
+    workerLogger := mainLogger.With("component", "Worker", "worker_id", "1")
+    // httpLogger := mainLogger.With("handler", "CalculateHandler")
     ctx = context.WithValue(ctx, logger.LoggerKey, mainLogger)
 
     // загружаем конфиг
     cfg, err := config.LoadConfig()
     if err != nil {
         fmt.Println(err)
-        panic(err)
+        os.Exit(1)
     }
     if cfg == nil {
-        panic("failed to load config")
+        mainLogger.Error(ctx, "failed to load config")
+        os.Exit(1)
     }
 
     // 1. база данных
     db, err := postgres.New(cfg.Postgres)
     if err != nil {
         fmt.Println(err)
-        panic(err)
+        mainLogger.Error(ctx, "failed to init postgres", "error", err)
+        os.Exit(1)
     }
 
     // 2. кэш (redis)
-    redis := cache.New(cfg.Redis)
+    redis := cache.New(cfg.Redis, mainLogger)
     fmt.Println(redis.Client.Ping(ctx)) // проверяем соединение
 
     // 3. фабрика репозиториев
@@ -59,11 +66,12 @@ func main() {
     // 4. jwt сервис — нужен для auth middleware
     jwtService := auth.NewJWTService(cfg.JWT)
 
+
     // 5. kafka — очередь задач
-    kafkaQueue, err := kafka.NewKafkaQueue(cfg.Kafka)
+    kafkaQueue, err := kafka.NewKafkaQueue(cfg.Kafka, kafkaLogger)
     if err != nil {
         mainLogger.Error(ctx, "failed to init kafka: "+err.Error())
-        panic(err)
+        os.Exit(1)
     }
 
     // 6. valueprovider — для получения переменных из redis
@@ -78,7 +86,7 @@ func main() {
     srv := service.NewCalculatorService(userRepo, kafkaQueue, exampleRepo, jwtService)
 
     // 9. воркер — обрабатывает задачи из kafka
-    worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider)
+    worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider, workerLogger)
     go worker.Start() // в отдельной горутине
 
     // 10. grpc сервер (gRPC + REST через gateway)

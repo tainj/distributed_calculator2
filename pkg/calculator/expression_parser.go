@@ -142,8 +142,8 @@ func (s *Expression) Convert() (bool, error) {
     return true, nil
 }
 
-func (s *Expression) Calculate() ([]models.Task, string) {
-    results := make([]models.Task, 0)
+func (s *Expression) Calculate() ([]*models.Task, string) {
+    results := make([]*models.Task, 0)
     expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
     for len(expression) != 1 {
         for index, sign := range expression {
@@ -159,7 +159,7 @@ func (s *Expression) Calculate() ([]models.Task, string) {
                     num2 = expression[index-1]
                     sign := "-" // всегда вычитание
                     result, variable := NewExample(num1, num2, sign)
-                    results = append(results, result)
+                    results = append(results, &result)
                     newExpr = replaceUnary(expression, index, variable)
                 } else {
                     // Бинарный оператор: +, -, *, /, ^
@@ -169,7 +169,7 @@ func (s *Expression) Calculate() ([]models.Task, string) {
                     num1 = expression[index-2]
                     num2 = expression[index-1]
                     result, variable := NewExample(num1, num2, sign)
-                    results = append(results, result)
+                    results = append(results, &result)
                     newExpr = replaceBinary(expression, index, variable)
                 }
 

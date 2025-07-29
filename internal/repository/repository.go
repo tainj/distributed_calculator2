@@ -15,7 +15,7 @@ type ExampleRepository interface {
     UpdateExample(ctx context.Context, exampleId string, result float64) error
     UpdateExampleWithError(ctx context.Context, exampleID, errorMsg string) error
     GetResult(ctx context.Context, exampleID string) (float64, error)
-    GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error)
+    GetExamplesByUserID(ctx context.Context, userID string) ([]models.Example, error)
 }
 
 type UserRepository interface {

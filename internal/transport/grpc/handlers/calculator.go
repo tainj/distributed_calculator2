@@ -18,7 +18,7 @@ type Service interface {
     GetResult(ctx context.Context, exampleID string) (float64, error)
     Register(ctx context.Context, user *models.UserCredentials) (*models.User, error)
     Login(ctx context.Context, user *models.UserCredentials) (*models.LoginResponse, error)
-    GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error)
+    GetExamplesByUserID(ctx context.Context, userID string) ([]models.Example, error)
 }
 
 // CalculatorService — gRPC сервер
@@ -46,7 +46,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, req *client.Calculate
     // извлекаем id
     r := pointer.Get(resp)
     return &client.CalculateResponse{
-        TaskId: r.Id,
+        TaskId: r.ID,
     }, nil
 }
 

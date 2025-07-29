@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,35 +36,41 @@ func NewCalculatorService(userRepo repo.UserRepository, kafkaQueue kafka.TaskQue
 
 // calculate — запускает вычисление выражения
 func (s *CalculatorService) Calculate(ctx context.Context, example *models.Example) (*models.Example, error) {
+    exampleID := uuid.New().String()
+
+    resultExample := &models.Example{
+        ID:         exampleID,
+        Expression: example.Expression,
+        UserID:     example.UserID,
+    }
+
     // создаём парсер выражения
     expr := calculator.NewExpression(example.Expression)
-    if !expr.Check() {
-        return nil, models.ErrCovertExample
-    }
 
     // переводим в польскую нотацию
     if _, err := expr.Convert(); err != nil {
-        return nil, err
-    }
+        errString := err.Error()
+        resultExample.Error = &errString
 
-    // генерируем id
-    exampleID := uuid.New().String()
+        // 🔽 ДОБАВЬ ЭТО
+        log.Printf("[DEBUG] Saving example with error: ID=%s, Expr=%s, Error=%s, Response=%q", 
+            resultExample.ID, resultExample.Expression, errString, resultExample.Response)
+
+        if errSave := s.repoExamples.SaveExample(ctx, resultExample); errSave != nil {
+            log.Printf("[ERROR] Failed to save example with error: %v", errSave)
+            return nil, fmt.Errorf("calculate: save example: %v", errSave)
+        }
+        return resultExample, err
+    }
 
     // считаем шаги и финальную переменную
     results, variable := expr.Calculate()
 
-    // формируем пример
-    example = &models.Example{
-        Id:             exampleID,
-        Expression:     example.Expression,
-        UserID:         example.UserID,
-        SimpleExamples: results,
-        Response:       variable,
-    }
+    // заполняем результат
+    resultExample.SimpleExamples = results
+    resultExample.Response = variable // не хватало этого!
 
-    // сохраняем в бд
-    err := s.repoExamples.SaveExample(ctx, example)
-    if err != nil {
+    if err := s.repoExamples.SaveExample(ctx, resultExample); err != nil {
         return nil, fmt.Errorf("calculate: save example: %v", err)
     }
 
@@ -76,7 +83,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
             Variable:  task.Variable,
             ExampleID: exampleID,
             Index:     i,
-            IsFinal:   task.Variable == variable, // последний шаг
+            IsFinal:   task.Variable == variable,
         }
 
         if err := s.kafkaQueue.SendTask(kafkaTask); err != nil {
@@ -84,7 +91,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
         }
     }
 
-    return example, nil
+    return resultExample, nil
 }
 
 // getresult — получает финальный результат по id
@@ -147,6 +154,6 @@ func (s *CalculatorService) Login(ctx context.Context, userRequest *models.UserC
     }, nil
 }
 
-func (s *CalculatorService) GetExamplesByUserID(ctx context.Context, userID string) ([]models.UserExample, error) {
+func (s *CalculatorService) GetExamplesByUserID(ctx context.Context, userID string) ([]models.Example, error) {
     return s.repoExamples.GetExamplesByUserID(ctx, userID)
 }

@@ -11,14 +11,6 @@ const (
 
 // для бизнес логики
 
-type Example struct {
-	Id             string  `json:"id"`
-	Expression     string  `json:"expression"`
-	SimpleExamples []Task  `json:"simple_examples"`
-	UserID         string  `json:"user_id""`
-	Response       string  `json:"response"`
-}
-
 type Task struct {
 	Num1      string `json:"num1"`
 	Num2      string `json:"num2"`
@@ -31,14 +23,15 @@ type Task struct {
 
 // для бд
 
-type UserExample struct {
-	ID         string   `json:"id" db:"id"`
-	Expression string   `json:"expression" db:"expression"`
-	Response   string   `json:"response" db:"response"`
-	Calculated bool     `json:"calculated" db:"calculated"`
-	Result     *float64 `json:"result,omitempty" db:"result"`
-	Error      *string  `json:"error,omitempty" db:"error"`
-	UserID     string   `json:"user_id" db:"user_id"`
+type Example struct {
+	ID         string      `json:"id" db:"id"`
+	Expression string      `json:"expression" db:"expression"`
+	Response   string      `json:"response" db:"response"`
+	Calculated bool        `json:"calculated" db:"calculated"`
+	Result     *float64    `json:"result,omitempty" db:"result"`
+	Error      *string     `json:"error,omitempty" db:"error"`
+	UserID     string      `json:"user_id" db:"user_id"`
+	SimpleExamples []*Task  `json:"simple_examples"` // для логики
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 

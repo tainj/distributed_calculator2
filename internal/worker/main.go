@@ -2,16 +2,16 @@
 package worker
 
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "log"
+	"context"
+	"encoding/json"
+	"fmt"
 
-    "github.com/tainj/distributed_calculator2/internal/models"
-    repo "github.com/tainj/distributed_calculator2/internal/repository"
-    "github.com/tainj/distributed_calculator2/internal/valueprovider"
-    "github.com/tainj/distributed_calculator2/pkg/calculator"
-    "github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
+	"github.com/tainj/distributed_calculator2/internal/models"
+	repo "github.com/tainj/distributed_calculator2/internal/repository"
+	"github.com/tainj/distributed_calculator2/internal/valueprovider"
+	"github.com/tainj/distributed_calculator2/pkg/calculator"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
+	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
 type Worker struct {
@@ -19,6 +19,7 @@ type Worker struct {
     cacheRepo     repo.VariableRepository
     kafkaQueue    kafka.TaskQueue
     valueProvider valueprovider.Provider
+    logger        logger.Logger
 }
 
 func NewWorker(
@@ -26,30 +27,31 @@ func NewWorker(
     cacheRepo repo.VariableRepository,
     kafkaQueue kafka.TaskQueue,
     valueProvider valueprovider.Provider,
+    logger logger.Logger,
 ) *Worker {
     return &Worker{
         exampleRepo:   exampleRepo,
         cacheRepo:     cacheRepo,
         kafkaQueue:    kafkaQueue,
         valueProvider: valueProvider,
+        logger:        logger,
     }
 }
 
 func (w *Worker) Start() {
-    log.Println("worker started, reading tasks from kafka...")
+    ctx := context.Background()
+    w.logger.Info(ctx, "worker started, reading tasks from kafka...")
     for {
-        ctx := context.Background()
-
         // читаем сообщение
         jsonData, message, err := w.kafkaQueue.ReadTask()
         if err != nil {
-            log.Printf("failed to read task from kafka: %v", err)
+            w.logger.Error(ctx, "failed to unmarshal task", "error", err)
             continue
         }
 
         var task models.Task
         if err := json.Unmarshal(jsonData, &task); err != nil {
-            log.Printf("failed to unmarshal task: %v", err)
+            w.logger.Error(ctx, fmt.Sprintf("failed to unmarshal task: %v", err))
             continue
         }
 
@@ -58,15 +60,15 @@ func (w *Worker) Start() {
 
         // если ошибка в выражении (деление на ноль и т.п.) — пишем в бд и коммитим
         if err != nil && (err == calculator.ErrDivisionByZero || err == calculator.ErrCovertExample) {
-            log.Printf("business error in task %s: %v", task.Variable, err)
+            w.logger.Debug(ctx, "business error in task", "task Variable", task.Variable, "error", err)
             if errDB := w.exampleRepo.UpdateExampleWithError(ctx, task.ExampleID, err.Error()); errDB != nil {
-                log.Printf("failed to save error to db: %v", errDB)
+                w.logger.Error(ctx, fmt.Sprintf("failed to save error to db: %v", errDB))
                 // не коммитим — попробуем снова
                 continue
             }
             // сохранили ошибку — можно коммитить
             if errCommit := w.kafkaQueue.Commit(message); errCommit != nil {
-                log.Printf("failed to commit after error: %v", errCommit)
+                w.logger.Error(ctx, fmt.Sprintf("failed to commit after error: %v", errCommit))
                 continue
             }
             continue
@@ -74,20 +76,20 @@ func (w *Worker) Start() {
 
         // если ошибка не в выражении (redis, сеть и т.п.) — не коммитим, кавка повторит
         if err != nil {
-            log.Printf("infra error, will retry: %v", err)
+            w.logger.Error(ctx, fmt.Sprintf("infra error, will retry: %v", err))
             continue
         }
 
         // всё ок — коммитим
         if err := w.kafkaQueue.Commit(message); err != nil {
-            log.Printf("failed to commit message: %v", err)
+            w.logger.Error(ctx, "failed to commit message", "error", err)
             continue
         }
 
         // если это финальный таск — сохраняем результат
         if task.IsFinal {
             if err := w.handleFinalTask(ctx, task, result); err != nil {
-                log.Printf("failed to save final result %s: %v", task.Variable, err)
+                w.logger.Error(ctx, "failed to save final result", "variable", task.Variable, "error", err)
                 // не критично — результат уже в редисе
             }
         }
@@ -116,7 +118,7 @@ func (w *Worker) ProcessTask(ctx context.Context, task models.Task) (float64, er
         return 0, fmt.Errorf("save result to Redis: %w", err)
     }
 
-    log.Printf("Task processed: %f %s %f = %f → %s", val1, task.Sign, val2, result, task.Variable)
+    w.logger.Info(ctx, "task processed", "num1", val1, "sign", task.Sign, "num2", val2, "result", result, "response", task.Variable)
     return result, nil
 }
 
@@ -126,6 +128,6 @@ func (w *Worker) handleFinalTask(ctx context.Context, task models.Task, result f
         return fmt.Errorf("update example in DB: %w", err)
     }
 
-    log.Printf("Final result saved: example=%s, result=%f", task.ExampleID, result)
+    w.logger.Info(ctx, "final result saved", "example", task.ExampleID, "result", result)
     return nil
 }
