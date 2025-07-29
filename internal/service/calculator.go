@@ -70,7 +70,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
         if errSave := s.repoExamples.SaveExample(ctx, resultExample); errSave != nil {
             return nil, fmt.Errorf("calculate: save example: %v", errSave)
         }
-        return resultExample, err
+        return resultExample, nil
     }
 
     // считаем шаги и финальную переменную

@@ -229,6 +229,12 @@ func (s *Expression) Convert() (bool, error) {
 func (s *Expression) Calculate() ([]*models.Task, string) {
     results := make([]*models.Task, 0)
     expression := strings.Split(s.Postfix, " ")  // формируем список из чисел и операторов
+    if len(expression) == 1 {
+        num := expression[0]
+        // считаем, что это: 0 + num
+        result, variable := NewExample("0", num, "+")
+        return append(results, &result), variable
+    }
     for len(expression) != 1 {
         for index, sign := range expression {
             if _, isOperator := OperatorPriority[sign]; isOperator {
