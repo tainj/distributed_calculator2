@@ -1,20 +1,22 @@
 package repository
 
 import (
-    "context"
-    "fmt"
+	"context"
+	"fmt"
 
-    sq "github.com/Masterminds/squirrel"
-    "github.com/tainj/distributed_calculator2/internal/models"
-    "github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	sq "github.com/Masterminds/squirrel"
+	"github.com/tainj/distributed_calculator2/internal/models"
+	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
 )
 
 type AuthUserRepository struct {
     db *postgres.DB
+    logger logger.Logger
 }
 
-func NewAuthUserRepository(db *postgres.DB) *AuthUserRepository {
-    return &AuthUserRepository{db: db}
+func NewAuthUserRepository(db *postgres.DB, logger logger.Logger) *AuthUserRepository {
+    return &AuthUserRepository{db: db, logger: logger}
 }
 
 func (r *AuthUserRepository) Register(ctx context.Context, user *models.User) error {
@@ -35,6 +37,8 @@ func (r *AuthUserRepository) Register(ctx context.Context, user *models.User) er
     if err != nil {
         return fmt.Errorf("failed to insert user: %w", err)
     }
+
+    r.logger.Debug(ctx, "the user has been successfully registered", "userId", user.ID)
 
     return nil
 }
@@ -66,6 +70,8 @@ func (r *AuthUserRepository) GetByEmail(ctx context.Context, email string) (*mod
         return nil, fmt.Errorf("failed to get user by email: %w", err)
     }
 
+    r.logger.Debug(ctx, "successful receiving a user by mail", "userId", user.ID)
+
     return &user, nil
 }
 
@@ -95,6 +101,8 @@ func (r *AuthUserRepository) GetByID(ctx context.Context, id string) (*models.Us
     if err != nil {
         return nil, fmt.Errorf("failed to get user by id: %w", err)
     }
+
+    r.logger.Debug(ctx, "successful receiving a user by id", "userId", user.ID)
 
     return &user, nil
 }

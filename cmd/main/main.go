@@ -31,7 +31,7 @@ func main() {
     // инициализируем логгеры
     mainLogger := logger.New(serviceName)
 
-    // Расширяем логгер для компонентов
+    // расширяем логгер для компонентов
     kafkaLogger := mainLogger.With("component", "KafkaConsumer")
     workerLogger := mainLogger.With("component", "Worker", "worker_id", "1")
     // httpLogger := mainLogger.With("handler", "CalculateHandler")
@@ -61,7 +61,7 @@ func main() {
     fmt.Println(redis.Client.Ping(ctx)) // проверяем соединение
 
     // 3. фабрика репозиториев
-    factory := repo.NewRepositoryFactory(db, redis)
+    factory := repo.NewRepositoryFactory(db, redis, mainLogger)
 
     // 4. jwt сервис — нужен для auth middleware
     jwtService := auth.NewJWTService(cfg.JWT)
@@ -83,7 +83,7 @@ func main() {
 	userRepo := factory.CreateUserRepository()
 
     // 8. сервис калькулятора
-    srv := service.NewCalculatorService(userRepo, kafkaQueue, exampleRepo, jwtService)
+    srv := service.NewCalculatorService(userRepo, exampleRepo, jwtService, kafkaQueue, mainLogger)
 
     // 9. воркер — обрабатывает задачи из kafka
     worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider, workerLogger)

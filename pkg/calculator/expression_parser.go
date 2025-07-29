@@ -5,7 +5,6 @@ import (
     "strings"
     "unicode"
 
-    "github.com/Knetic/govaluate"
     "github.com/google/uuid"
     "github.com/tainj/distributed_calculator2/internal/models"
 )
@@ -70,9 +69,94 @@ func NewExpression(str string) *Expression {
     return &Expression{Infix: str}
 }
 
-func (s *Expression) Check() bool {  // проверяется выражение на то, является ли оно корректным
-    _, err := govaluate.NewEvaluableExpression(s.Infix)
-    return err == nil
+// Check валидирует выражение без использования govaluate.
+func (s *Expression) Check() bool {
+    return s.IsValidMathExpression()
+}
+
+// IsValidMathExpression проверяет, является ли строка корректным математическим выражением.
+// поддерживает: цифры, +, -, *, /, ^, ~ (унарный минус), ., ()
+func (s *Expression) IsValidMathExpression() bool {
+    expr := strings.ReplaceAll(s.Infix, " ", "")
+    if expr == "" {
+        return false
+    }
+
+    // разрешённые символы
+    allowed := "+-*/().~^"
+    for i, ch := range expr {
+        if !unicode.IsDigit(ch) && !strings.ContainsRune(allowed, ch) {
+            return false
+        }
+
+        // запрещаем точку в конце
+        if ch == '.' {
+            if i == len(expr)-1 {
+                return false
+            }
+            next := rune(expr[i+1])
+            if !unicode.IsDigit(next) {
+                return false
+            }
+        }
+    }
+
+    // проверка скобок
+    balance := 0
+    for _, ch := range expr {
+        if ch == '(' {
+            balance++
+        } else if ch == ')' {
+            balance--
+            if balance < 0 {
+                return false // лишняя закрывающая
+            }
+        }
+    }
+    if balance != 0 {
+        return false // несбалансированы
+    }
+
+    // проверка на подряд идущие операторы
+    binaryOps := "+-*/^"
+    for i := 0; i < len(expr)-1; i++ {
+        curr := rune(expr[i])
+        next := rune(expr[i+1])
+
+        // два бинарных оператора подряд — ошибка
+        if strings.ContainsRune(binaryOps, curr) && strings.ContainsRune(binaryOps, next) {
+            return false
+        }
+
+        // ~ — унарный минус
+        if curr == '~' {
+            if i == len(expr)-1 {
+                return false // ~ в конце
+            }
+            if next != '(' && !unicode.IsDigit(next) && next != '~' {
+                return false // после ~ должно быть число, ( или ~
+            }
+        }
+    }
+
+    // проверка первого символа
+    first := rune(expr[0])
+    if !isDigitOrUnaryMinusOrOpenParen(first) {
+        return false
+    }
+
+    // проверка последнего символа
+    last := rune(expr[len(expr)-1])
+    if strings.ContainsRune("+-*/^~", last) {
+        return false
+    }
+
+    return true
+}
+
+// isDigitOrUnaryMinusOrOpenParen проверяет, можно ли начать выражение с этого символа.
+func isDigitOrUnaryMinusOrOpenParen(ch rune) bool {
+    return unicode.IsDigit(ch) || ch == '~' || ch == '('
 }
 
 func (s *Expression) Convert() (bool, error) {

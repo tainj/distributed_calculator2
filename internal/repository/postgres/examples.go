@@ -9,14 +9,16 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/tainj/distributed_calculator2/internal/models"
 	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
 )
 
-func NewPostgresResultRepository(db *postgres.DB) *PostgresResultRepository {
-    return &PostgresResultRepository{db: db}
+func NewPostgresResultRepository(db *postgres.DB, logger logger.Logger) *PostgresResultRepository {
+    return &PostgresResultRepository{db: db, logger: logger}
 }
 
 type PostgresResultRepository struct {
     db *postgres.DB
+    logger logger.Logger
 }
 
 func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *models.Example) error {
@@ -39,7 +41,7 @@ func (r *PostgresResultRepository) SaveExample(ctx context.Context, example *mod
     if err != nil {
         return fmt.Errorf("repository.SaveExample: failed to insert example: %w", err)
     }
-    
+    r.logger.Debug(ctx, "save example", "exampleId", example.ID)
     return nil
 }
 
@@ -57,15 +59,17 @@ func (r *PostgresResultRepository) UpdateExample(ctx context.Context, exampleId 
     if err != nil {
         return fmt.Errorf("repository.UpdateExample: %w", err)
     }
-    
+
+    r.logger.Debug(ctx, "updating example", "exampleId", exampleId)
+
     return nil
 }
 
-func (r *PostgresResultRepository) UpdateExampleWithError(ctx context.Context, exampleID, errorMsg string) error {
+func (r *PostgresResultRepository) UpdateExampleWithError(ctx context.Context, exampleId, errorMsg string) error {
     query := sq.Update("examples").
         Set("calculated", true).
         Set("error", errorMsg).
-        Where(sq.Eq{"id": exampleID}).
+        Where(sq.Eq{"id": exampleId}).
         PlaceholderFormat(sq.Dollar).
         RunWith(r.db.Db)
 
@@ -73,6 +77,9 @@ func (r *PostgresResultRepository) UpdateExampleWithError(ctx context.Context, e
     if err != nil {
         return fmt.Errorf("failed to update example with error: %w", err)
     }
+
+    r.logger.Debug(ctx, "updating example with error", "exampleId", exampleId, "errorMsg", errorMsg)
+
     return nil
 }
 
@@ -106,6 +113,8 @@ func (r *PostgresResultRepository) GetResult(ctx context.Context, exampleID stri
     if !result.Valid {
         return 0, fmt.Errorf("result is not available")
     }
+
+    r.logger.Debug(ctx, "successful receipt of the result", "exampleId", exampleID, "result", result)
 
     return result.Float64, nil
 }
@@ -160,6 +169,8 @@ func (r *PostgresResultRepository) GetExamplesByUserID(ctx context.Context, user
     if err := rows.Err(); err != nil {
         return nil, fmt.Errorf("row iteration error: %w", err)
     }
+
+    r.logger.Debug(ctx, "successful receipt of examples", "userId", userID)
 
     return examples, nil
 }

@@ -13,8 +13,9 @@ func main() {
 	// }
 	// fmt.Println(cfg)
 
-	example := calculator.NewExpression("~(~5)")
+	example := calculator.NewExpression("2 + 3")
 	fmt.Println(example.Convert())
+	fmt.Println(example.Check())
 	fmt.Println(example.Infix)
 	fmt.Println(example.Postfix)
 }

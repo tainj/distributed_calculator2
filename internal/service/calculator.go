@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/tainj/distributed_calculator2/internal/models"
 	repo "github.com/tainj/distributed_calculator2/internal/repository"
 	"github.com/tainj/distributed_calculator2/pkg/calculator"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
 	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
@@ -22,20 +22,29 @@ type CalculatorService struct {
     repoExamples repo.ExampleRepository
     kafkaQueue   kafka.TaskQueue
     jwtService   auth.JWTService
+    logger       logger.Logger
 }
 
 // newcalculator service
-func NewCalculatorService(userRepo repo.UserRepository, kafkaQueue kafka.TaskQueue, repoExample repo.ExampleRepository, jwtService   auth.JWTService) *CalculatorService {
+func NewCalculatorService(
+    userRepo repo.UserRepository,
+    exampleRepo repo.ExampleRepository,
+    jwtService auth.JWTService,
+    kafkaQueue kafka.TaskQueue,
+    logger logger.Logger,
+    ) *CalculatorService {
     return &CalculatorService{
         kafkaQueue:   kafkaQueue,
-        repoExamples: repoExample,
+        repoExamples: exampleRepo,
 		userRepo: userRepo,
         jwtService: jwtService,
+        logger: logger.With("layer", "service"),
     }
 }
 
 // calculate — запускает вычисление выражения
 func (s *CalculatorService) Calculate(ctx context.Context, example *models.Example) (*models.Example, error) {
+    s.logger.Debug(ctx, "calculate request received", "example_id", example.ID, "user_id", example.UserID, "expression", example.Expression)
     exampleID := uuid.New().String()
 
     resultExample := &models.Example{
@@ -52,12 +61,13 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
         errString := err.Error()
         resultExample.Error = &errString
 
-        // 🔽 ДОБАВЬ ЭТО
-        log.Printf("[DEBUG] Saving example with error: ID=%s, Expr=%s, Error=%s, Response=%q", 
-            resultExample.ID, resultExample.Expression, errString, resultExample.Response)
+        s.logger.Warn(ctx, "saving example with error", 
+            "exampleId", resultExample.ID, 
+            "expression", resultExample.Expression,
+            "error", resultExample.Error,
+        )
 
         if errSave := s.repoExamples.SaveExample(ctx, resultExample); errSave != nil {
-            log.Printf("[ERROR] Failed to save example with error: %v", errSave)
             return nil, fmt.Errorf("calculate: save example: %v", errSave)
         }
         return resultExample, err
@@ -90,7 +100,7 @@ func (s *CalculatorService) Calculate(ctx context.Context, example *models.Examp
             return nil, fmt.Errorf("failed to send task to kafka: %w", err)
         }
     }
-
+    s.logger.Debug(ctx, "example saved and tasks sent to kafka", "example_id", resultExample.ID)
     return resultExample, nil
 }
 

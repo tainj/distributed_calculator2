@@ -45,7 +45,10 @@ func (l *logger) Debug(ctx context.Context, msg string, keysAndValues ...any) {
 }
 
 func New(serviceName string) Logger {
-    log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+    opts := &slog.HandlerOptions{
+        Level: slog.LevelDebug,
+    }
+    log := slog.New(slog.NewJSONHandler(os.Stdout, opts))
     log = log.With(ServiceName, serviceName)
     return &logger{log: log}
 }
