@@ -36,6 +36,25 @@ export default function Examples() {
     }
   };
 
+  // ✅ Функция для определения типа ошибки
+  const getErrorMessage = (errorText) => {
+    if (!errorText) return 'неизвестная ошибка';
+
+    const lower = errorText.toLowerCase();
+
+    if (lower.includes('division by zero')) {
+      return 'деление на ноль';
+    }
+
+    if (lower.includes('not a mathematical expression') || 
+        lower.includes('calculation failed') ||
+        lower.includes('line is not a mathematical expression')) {
+      return 'данное выражение не поддерживается или его нельзя посчитать';
+    }
+
+    return 'неизвестная ошибка';
+  };
+
   if (loading) {
     return (
       <div className="container">
@@ -102,7 +121,9 @@ export default function Examples() {
                   ) : ex.result !== undefined ? (
                     <strong style={{ color: '#bb86fc' }}>Результат: {ex.result}</strong>
                   ) : (
-                    <span style={{ color: '#cf6679' }}>Ошибка: деление на ноль</span>
+                    <span style={{ color: '#cf6679' }}>
+                      Ошибка: {getErrorMessage(ex.error)}
+                    </span>
                   )}
                 </div>
 

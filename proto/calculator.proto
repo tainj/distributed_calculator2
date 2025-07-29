@@ -82,6 +82,7 @@ message Example {
   bool calculated = 3;
   optional double result = 4;
   string created_at = 5;
+  optional string error = 6; // ← Новое поле!
 }
 
 message RegisterRequest {

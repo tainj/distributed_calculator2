@@ -138,6 +138,7 @@ func (s *CalculatorService) GetAllExamples(ctx context.Context, req *client.GetA
             Expression: example.Expression,
             Calculated: example.Calculated,
             Result:     example.Result, // может быть nil
+            Error:      example.Error,
             CreatedAt:  example.CreatedAt.Format(time.RFC3339), // нормальный формат времени
         })
     }

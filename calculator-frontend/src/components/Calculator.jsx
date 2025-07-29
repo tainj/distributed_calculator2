@@ -26,10 +26,13 @@ export default function Calculator() {
     if (!token) return alert('Войдите, чтобы вычислять!');
 
     setLoading(true);
-    setResult('');
+    setResult('📤 Отправка выражения...'); // ✅ Показываем сразу
+
     try {
       const res = await api.post('/v1/calculate', { expression: expr });
       const taskId = res.data.taskId;
+
+      setResult('⏳ Задача отправлена, ждём результат...'); // ✅ Показываем после получения taskId
 
       let attempts = 0;
       const max = 15;
@@ -46,6 +49,8 @@ export default function Calculator() {
               setResult(`❌ ${res2.data.error}`);
               clearInterval(interval);
               setLoading(false);
+            } else {
+              setResult(`⏳ Задача ещё в обработке... (${attempts}/${max})`); // ✅ Промежуточный статус
             }
           }
         } catch (err) {
@@ -53,6 +58,8 @@ export default function Calculator() {
             setResult('⚠️ Ошибка соединения');
             clearInterval(interval);
             setLoading(false);
+          } else {
+            setResult(`🔁 Попытка ${attempts}/${max}...`);
           }
         }
         if (attempts >= max) {
