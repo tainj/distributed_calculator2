@@ -11,8 +11,6 @@ import (
     repo "github.com/tainj/distributed_calculator2/internal/repository"
     service "github.com/tainj/distributed_calculator2/internal/service"
     "github.com/tainj/distributed_calculator2/internal/transport/grpc"
-    "github.com/tainj/distributed_calculator2/internal/valueprovider"
-    "github.com/tainj/distributed_calculator2/internal/worker"
     "github.com/tainj/distributed_calculator2/pkg/config"
     "github.com/tainj/distributed_calculator2/pkg/db/cache"
     "github.com/tainj/distributed_calculator2/pkg/db/postgres"
@@ -33,7 +31,7 @@ func main() {
 
     // расширяем логгер для компонентов
     kafkaLogger := mainLogger.With("component", "KafkaConsumer")
-    workerLogger := mainLogger.With("component", "Worker", "worker_id", "1")
+    // workerLogger := mainLogger.With("component", "Worker", "worker_id", "1")
     // httpLogger := mainLogger.With("handler", "CalculateHandler")
     ctx = context.WithValue(ctx, logger.LoggerKey, mainLogger)
 
@@ -43,6 +41,7 @@ func main() {
         fmt.Println(err)
         os.Exit(1)
     }
+
     if cfg == nil {
         mainLogger.Error(ctx, "failed to load config")
         os.Exit(1)
@@ -75,10 +74,10 @@ func main() {
     }
 
     // 6. valueprovider — для получения переменных из redis
-    valueProvider := valueprovider.NewRedisValueProvider(redis)
+    // valueProvider := valueprovider.NewRedisValueProvider(redis)
 
     // 7. репозитории
-    variableRepo := factory.CreateVariableRepository() // для сохранения результатов
+    // variableRepo := factory.CreateVariableRepository() // для сохранения результатов
     exampleRepo := factory.CreateExampleRepository()   // для сохранения выражений
 	userRepo := factory.CreateUserRepository()
 
@@ -86,8 +85,8 @@ func main() {
     srv := service.NewCalculatorService(userRepo, exampleRepo, jwtService, kafkaQueue, mainLogger)
 
     // 9. воркер — обрабатывает задачи из kafka
-    worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider, workerLogger)
-    go worker.Start() // в отдельной горутине
+    // worker := worker.NewWorker(exampleRepo, variableRepo, kafkaQueue, valueProvider, workerLogger)
+    // go worker.Start() // в отдельной горутине
 
     // 10. grpc сервер (gRPC + REST через gateway)
     grpcServer, err := grpc.New(ctx, cfg.Grpc.GRPCPort, cfg.Grpc.RestPort, srv, jwtService)

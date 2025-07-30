@@ -34,7 +34,7 @@ func New(ctx context.Context,
     // берём логгер из контекста
     loggerFromCtx := logger.GetLoggerFromCtx(ctx)
 
-    lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+    lis, err := net.Listen("tcp", fmt.Sprintf("api:%d", port))
     if err != nil {
         loggerFromCtx.Error(ctx, "failed to listen", "error", err)
     }

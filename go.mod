@@ -4,7 +4,6 @@ go 1.23.0
 
 require (
 	github.com/AlekSi/pointer v1.2.0
-	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
