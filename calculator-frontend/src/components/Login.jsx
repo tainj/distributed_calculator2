@@ -47,7 +47,7 @@ export default function Login() {
     }}>
       <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
         <h2 style={{ color: '#bb86fc', textAlign: 'center', marginBottom: '20px' }}>
-          Вход в CalcPro
+          Вход в CalcFlow
         </h2>
 
         {error && (

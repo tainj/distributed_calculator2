@@ -6,7 +6,7 @@ export default function Home() {
     <div className="container">
       <div className="card" style={{ textAlign: 'center', padding: '40px 30px' }}>
         <h1 style={{ color: '#bb86fc', fontSize: '2.5rem', marginBottom: '10px' }}>
-          🚀 CalcPro
+          🚀 CalcFlow
         </h1>
         <p style={{ fontSize: '1.1rem', color: '#aaa', marginBottom: '30px' }}>
           Распределённый калькулятор на Go

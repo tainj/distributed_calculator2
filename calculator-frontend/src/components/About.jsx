@@ -11,7 +11,7 @@ export default function About() {
         </h2>
         
         <p style={{ color: '#e0e0e0', fontSize: '1.1rem' }}>
-          <strong>CalcPro</strong> — это распределённая система на <strong style={{ color: '#00ADD8' }}>Go</strong>, использующая <strong>Apache Kafka</strong>, <strong>Redis</strong>, <strong>PostgreSQL</strong> и <strong>gRPC</strong>.
+          <strong>CalcFlow</strong> — это распределённая система на <strong style={{ color: '#00ADD8' }}>Go</strong>, использующая <strong>Apache Kafka</strong>, <strong>Redis</strong>, <strong>PostgreSQL</strong> и <strong>gRPC</strong>.
         </p>
 
         <h3 style={{ color: '#03dac6', marginTop: '30px' }}>🚀 Как это работает</h3>

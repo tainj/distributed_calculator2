@@ -38,7 +38,7 @@ export default function Navbar() {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent'
         }}>
-          CalcPro
+          CalcFlow
         </Link>
       </div>
 
