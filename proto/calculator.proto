@@ -2,40 +2,107 @@ syntax = "proto3";
 
 package calculator;
 
-option go_package = "github.com/tainj/distributed_calculator2/pkg/api"; // ДОБАВЬ ЭТО
+option go_package = "github.com/tainj/distributed_calculator2/pkg/api";
 
-import "google/api/annotations.proto"; // Импортируем аннотации для HTTP
+import "google/api/annotations.proto";
 
+// ================== ОСНОВНОЙ СЕРВИС ==================
 service Calculator {
-  rpc Calculate(CalculationRequest) returns (CalculationResponse) {
+  // Вычислить выражение
+  rpc Calculate(CalculateRequest) returns (CalculateResponse) {
     option (google.api.http) = {
-      post: "/v1/calculate"  // HTTP POST запрос на /v1/calculate
-      body: "*"              // Тело запроса содержит JSON
+      post: "/v1/calculate"
+      body: "*"
     };
   }
 
+  // Получить результат — через ТЕЛО
   rpc GetResult(GetResultRequest) returns (GetResultResponse) {
     option (google.api.http) = {
-      get: "/v1/result/{task_id}"  // HTTP GET запрос на /v1/result/{task_id}
+      post: "/v1/result"
+      body: "*"
+    };
+  }
+
+  // Получить все примеры — через тело
+  rpc GetAllExamples(GetAllExamplesRequest) returns (GetAllExamplesResponse) {
+    option (google.api.http) = {
+      post: "/v1/examples"
+      body: "*"
+    };
+  }
+
+  // Регистрация — через тело
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/v1/register"
+      body: "*"
+    };
+  }
+
+  // Логин — через тело
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/login"
+      body: "*"
     };
   }
 }
 
-message CalculationRequest {
-  string expression = 1; // Выражение для вычисления (например, "10 + 2 * 5 - 3")
+// ================== МОДЕЛИ ==================
+
+message CalculateRequest {
+  string expression = 1;
 }
 
-message CalculationResponse {
-  string task_id = 1; // Уникальный ID задачи
+message CalculateResponse {
+  string task_id = 1;
 }
 
 message GetResultRequest {
-  string task_id = 1; // ID задачи, для которой нужно получить результат
+  string task_id = 1;
 }
 
 message GetResultResponse {
   oneof result {
-    double value = 1;    // Результат вычисления
-    string error = 2;    // Сообщение об ошибке
+    double value = 1;
+    string error = 2;
   }
+}
+
+message GetAllExamplesRequest {}
+
+message GetAllExamplesResponse {
+  repeated Example examples = 1;
+}
+
+message Example {
+  string id = 1;
+  string expression = 2;
+  bool calculated = 3;
+  optional double result = 4;
+  string created_at = 5;
+  optional string error = 6; // ← Новое поле!
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string token = 2;
+  string user_id = 3;
+  string error = 4;
 }

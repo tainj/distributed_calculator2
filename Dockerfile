@@ -1,20 +1,35 @@
-FROM golang:1.21-alpine AS builder
+# Стадия 1: сборка
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
+# Шаг 1: копируем ТОЛЬКО go.mod и go.sum
 COPY go.mod go.sum ./
+
+# Шаг 2: загружаем зависимости (этот слой будет закеширован, если mod/sum не менялись)
 RUN go mod download
 
+# Шаг 3: копируем ВЕСЬ код (уже после зависимостей)
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /calculator
 
+# Шаг 4: собираем бинарники
+RUN go build -o main cmd/main/main.go
+RUN go build -o worker cmd/worker/main.go
+
+# Стадия 2: минимальный образ
 FROM alpine:latest
 
-WORKDIR /app
+RUN apk --no-cache add ca-certificates
 
-COPY --from=builder /calculator /app/calculator
-COPY --from=builder /app/.env /app/.env
+WORKDIR /root/
 
-EXPOSE 8080
+# Копируем бинарники и .env
+COPY --from=builder /app/main ./main
+COPY --from=builder /app/worker ./worker
+COPY --from=builder /app/.env .env
 
-CMD ["/app/calculator"]
+RUN chmod +x ./main ./worker
+
+EXPOSE 8080 50051 8081 8082 8083
+
+# Команда будет задана в docker-compose

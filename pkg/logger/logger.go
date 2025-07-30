@@ -1,60 +1,61 @@
 package logger
 
 import (
-	"context"
-	"log/slog"
+    "context"
+    "log/slog"
+    "os"
 )
 
 const (
-	LoggerKey   = "logger"
-	RequestID   = "requestID"
-	ServiceName = "service"
+    LoggerKey   = "logger"
+    RequestID   = "requestID"
+    ServiceName = "service"
 )
 
 type Logger interface {
-	Info(ctx context.Context, msg string, fields ...any)
-	Error(ctx context.Context, msg string, fields ...any)
+    Info(ctx context.Context, msg string, keysAndValues ...any)
+    Warn(ctx context.Context, msg string, keysAndValues ...any)
+    Error(ctx context.Context, msg string, keysAndValues ...any)
+    Debug(ctx context.Context, msg string, keysAndValues ...any)
+    With(args ...any) Logger
 }
 
 type logger struct {
-	serviceName string
-	logger      *slog.Logger
+    log *slog.Logger
 }
 
-func (l *logger) Info(ctx context.Context, msg string, fields ...any) {
-	// добавляем serviceName и requestID в логи
-	attrs := []any{slog.String(ServiceName, l.serviceName)}
-	if ctx.Value(RequestID) != nil {
-		attrs = append(attrs, slog.String(RequestID, ctx.Value(RequestID).(string)))
-	}
-
-	// логируем с контекстом
-	l.logger.InfoContext(ctx, msg, append(attrs, fields...)...)
+func (l *logger) With(args ...any) Logger {
+    return &logger{log: l.log.With(args...)}
 }
 
-func (l *logger) Error(ctx context.Context, msg string, fields ...any) {
-	// добавляем serviceName и requestID в логи
-	attrs := []any{slog.String(ServiceName, l.serviceName)}
-	if ctx.Value(RequestID) != nil {
-		attrs = append(attrs, slog.String(RequestID, ctx.Value(RequestID).(string)))
-	}
-
-	// логируем с контекстом
-	l.logger.ErrorContext(ctx, msg, append(attrs, fields...)...)
+func (l *logger) Info(ctx context.Context, msg string, keysAndValues ...any) {
+    l.log.InfoContext(ctx, msg, keysAndValues...)
 }
 
-// New создаёт новый логгер
+func (l *logger) Warn(ctx context.Context, msg string, keysAndValues ...any) {
+    l.log.WarnContext(ctx, msg, keysAndValues...)
+}
+
+func (l *logger) Error(ctx context.Context, msg string, keysAndValues ...any) {
+    l.log.ErrorContext(ctx, msg, keysAndValues...)
+}
+
+func (l *logger) Debug(ctx context.Context, msg string, keysAndValues ...any) {
+    l.log.DebugContext(ctx, msg, keysAndValues...)
+}
+
 func New(serviceName string) Logger {
-	return &logger{
-		serviceName: serviceName,
-		logger:      slog.Default(), // используем стандартный логгер
-	}
+    opts := &slog.HandlerOptions{
+        Level: slog.LevelDebug,
+    }
+    log := slog.New(slog.NewJSONHandler(os.Stdout, opts))
+    log = log.With(ServiceName, serviceName)
+    return &logger{log: log}
 }
 
-// GetLoggerFromCtx возвращает логгер из контекста
 func GetLoggerFromCtx(ctx context.Context) Logger {
-	if ctxLogger, ok := ctx.Value(LoggerKey).(Logger); ok {
-		return ctxLogger
-	}
-	return New("default") // возвращаем логгер по умолчанию, если в контексте нет логгера
+    if lg, ok := ctx.Value(LoggerKey).(Logger); ok {
+        return lg
+    }
+    return New("default")
 }

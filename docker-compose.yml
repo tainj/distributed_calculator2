@@ -1,4 +1,6 @@
+# docker-compose.yml
 services:
+  # === KAFKA КЛАСТЕР (KRaft) ===
   kafka-1:
     image: confluentinc/cp-kafka:latest
     container_name: calculator-kafka-1
@@ -11,7 +13,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"
       KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka-1:19092,CONTROLLER://kafka-1:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://kafka-1:9092,INTERNAL://kafka-1:19092,CONTROLLER://kafka-1:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -20,6 +22,13 @@ services:
       - kafka_data_1:/var/lib/kafka/data
     networks:
       - calculator-network
+    healthcheck:
+      test: >
+        bash -c 'kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1 && exit 0 || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   kafka-2:
     image: confluentinc/cp-kafka:latest
@@ -33,7 +42,7 @@ services:
       KAFKA_NODE_ID: 2
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"
       KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9094,INTERNAL://0.0.0.0:19094,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9094,INTERNAL://kafka-2:19094,CONTROLLER://kafka-2:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://kafka-2:9094,INTERNAL://kafka-2:19094,CONTROLLER://kafka-2:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -42,6 +51,13 @@ services:
       - kafka_data_2:/var/lib/kafka/data
     networks:
       - calculator-network
+    healthcheck:
+      test: >
+        bash -c 'kafka-broker-api-versions --bootstrap-server localhost:9094 >/dev/null 2>&1 && exit 0 || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   kafka-3:
     image: confluentinc/cp-kafka:latest
@@ -55,7 +71,7 @@ services:
       KAFKA_NODE_ID: 3
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"
       KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9096,INTERNAL://0.0.0.0:19096,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9096,INTERNAL://kafka-3:19096,CONTROLLER://kafka-3:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://kafka-3:9096,INTERNAL://kafka-3:19096,CONTROLLER://kafka-3:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -64,7 +80,15 @@ services:
       - kafka_data_3:/var/lib/kafka/data
     networks:
       - calculator-network
+    healthcheck:
+      test: >
+        bash -c 'kafka-broker-api-versions --bootstrap-server localhost:9096 >/dev/null 2>&1 && exit 0 || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
+  # === REDIS ===
   redis:
     image: redis:7-alpine
     container_name: calculator-redis
@@ -81,6 +105,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # === POSTGRES ===
   postgres:
     image: postgres:15-alpine
     container_name: calculator-postgres
@@ -100,6 +125,133 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - calculator-network
+
+  # === MIGRATE ===
+  migrate:
+    image: migrate/migrate:latest
+    command: -path /migrations -database postgres://calculator:verydifficlutpassword@postgres:5432/calculator_db?sslmode=disable up
+    volumes:
+      - ./migrations:/migrations
+    environment:
+      POSTGRES_USER: calculator
+      POSTGRES_PASSWORD: verydifficlutpassword
+      POSTGRES_DB: calculator_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - calculator-network
+    restart: "no"
+
+    # === CREATE TOPICS ===
+  create-topics:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+    command: >
+      sh -c '
+        echo "Ожидание Kafka..." &&
+        sleep 15 &&
+        
+        # Проверяем, существует ли топик
+        if kafka-topics --bootstrap-server kafka-1:9092 --list | grep -q "calculator_tasks"; then
+          echo "✅ Топик calculator_tasks уже существует"
+        else
+          echo "Создаю топик calculator_tasks..."
+          kafka-topics --bootstrap-server kafka-1:9092 --create --topic calculator_tasks --partitions 3 --replication-factor 1 &&
+          echo "✅ Топик calculator_tasks создан"
+        fi &&
+        
+        echo "Список топиков:" &&
+        kafka-topics --bootstrap-server kafka-1:9092 --list
+      '
+    networks:
+      - calculator-network
+
+  # === API СЕРВЕР ===
+  api:
+    build: .
+    command: ./main
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      - KAFKA_BROKERS=kafka-1:9092,kafka-2:19092,kafka-3:19093
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_DSN=host=postgres user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      create-topics:
+        condition: service_completed_successfully
+      kafka-1:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - calculator-network
+
+  # === ВОРКЕРЫ ===
+  worker1:
+    build: .
+    command: ./worker
+    environment:
+      - WORKER_PORT=8081
+      - KAFKA_BROKERS=kafka-1:9092,kafka-2:19092,kafka-3:19093
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_DSN=host=postgres user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable
+    ports:
+      - "8081:8081"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      create-topics:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    networks:
+      - calculator-network
+
+  worker2:
+    build: .
+    command: ./worker
+    environment:
+      - WORKER_PORT=8082
+      - KAFKA_BROKERS=kafka-1:9092,kafka-2:19092,kafka-3:19093
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_DSN=host=postgres user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable
+    ports:
+      - "8082:8082"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      create-topics:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    networks:
+      - calculator-network
+
+  worker3:
+    build: .
+    command: ./worker
+    environment:
+      - WORKER_PORT=8083
+      - KAFKA_BROKERS=kafka-1:9092,kafka-2:19092,kafka-3:19093
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_DSN=host=postgres user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable
+    ports:
+      - "8083:8083"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      create-topics:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
     networks:
       - calculator-network
 

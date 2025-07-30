@@ -60,52 +60,100 @@ func TestNewNode_GeneratesVariable(t *testing.T) {
 	}
 }
 
-func TestReplaceExpr(t *testing.T) {
-	tests := []struct {
-		name     string
-		expr     []string
-		opIndex  int
-		varName  string
-		expected []string
-	}{
-		{
-			name:     "basic replacement",
-			expr:     []string{"2", "3", "+"},
-			opIndex:  2,
-			varName:  "tmp1",
-			expected: []string{"tmp1"},
-		},
-		{
-			name:     "middle of expression",
-			expr:     []string{"tmp1", "4", "*"},
-			opIndex:  2,
-			varName:  "tmp2",
-			expected: []string{"tmp2"},
-		},
-		{
-			name:     "complex chain",
-			expr:     []string{"2", "3", "+", "4", "*", "5", "+"},
-			opIndex:  2,
-			varName:  "tmp1",
-			expected: []string{"tmp1", "4", "*", "5", "+"},
-		},
-		{
-			name:     "out of bounds start",
-			expr:     []string{"+", "3", "*"},
-			opIndex:  0,
-			varName:  "tmp",
-			expected: []string{"tmp", "3", "*"},
-		},
-	}
+func TestReplaceUnary(t *testing.T) {
+    tests := []struct {
+        name     string
+        expr     []string
+        opIndex  int
+        varName  string
+        expected []string
+    }{
+        {
+            name:     "basic unary: 4 ~",
+            expr:     []string{"4", "~"},
+            opIndex:  1,
+            varName:  "v1",
+            expected: []string{"v1"},
+        },
+        {
+            name:     "unary in middle: 3 4 ~ *",
+            expr:     []string{"3", "4", "~", "*"},
+            opIndex:  2,
+            varName:  "v1",
+            expected: []string{"3", "v1", "*"},
+        },
+        {
+            name:     "unary at start: ~ 5 +",
+            expr:     []string{"~", "5", "+"}, // редкий случай, но на всякий
+            opIndex:  0,
+            varName:  "v1",
+            expected: []string{"v1", "5", "+"},
+        },
+        {
+            name:     "complex: a b ~ c +",
+            expr:     []string{"a", "b", "~", "c", "+"},
+            opIndex:  2,
+            varName:  "v1",
+            expected: []string{"a", "v1", "c", "+"},
+        },
+    }
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := replaceExpr(tt.expr, tt.opIndex, tt.varName)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("replaceExpr() = %v, expected %v", result, tt.expected)
-			}
-		})
-	}
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := replaceUnary(tt.expr, tt.opIndex, tt.varName)
+            if !reflect.DeepEqual(result, tt.expected) {
+                t.Errorf("replaceUnary() = %v, expected %v", result, tt.expected)
+            }
+        })
+    }
+}
+
+func TestReplaceBinary(t *testing.T) {
+    tests := []struct {
+        name     string
+        expr     []string
+        opIndex  int
+        varName  string
+        expected []string
+    }{
+        {
+            name:     "basic binary: 2 3 +",
+            expr:     []string{"2", "3", "+"},
+            opIndex:  2,
+            varName:  "v1",
+            expected: []string{"v1"},
+        },
+        {
+            name:     "binary in middle: tmp1 4 *",
+            expr:     []string{"tmp1", "4", "*"},
+            opIndex:  2,
+            varName:  "v2",
+            expected: []string{"v2"},
+        },
+        {
+            name:     "complex chain: 2 3 + 4 * 5 +",
+            expr:     []string{"2", "3", "+", "4", "*", "5", "+"},
+            opIndex:  2,
+            varName:  "tmp1",
+            expected: []string{"tmp1", "4", "*", "5", "+"},
+        },
+        {
+            name:     "at start with offset",
+            expr:     []string{"+", "3", "*"}, // редко, но проверим
+            opIndex:  0,
+            varName:  "tmp",
+            expected: []string{"tmp", "3", "*"},
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := replaceBinary(tt.expr, tt.opIndex, tt.varName)
+            if !reflect.DeepEqual(result, tt.expected) {
+                t.Errorf("replaceBinary() = %v, expected %v", result, tt.expected)
+            }
+        })
+    }
 }
 
 func TestExpression_Calculate(t *testing.T) {
@@ -138,6 +186,36 @@ func TestExpression_Calculate(t *testing.T) {
 			postfix:       "42",
 			expectedCount: 0,
 			finalIsVar:    false, // final = "42"
+		},
+		{
+			name:          "Unary minus: ~2",
+			postfix:       "2 ~",
+			expectedCount: 1,
+			finalIsVar:    true,
+		},
+		{
+			name:          "Unary minus in expression: ~2 + 3",
+			postfix:       "2 ~ 3 +",
+			expectedCount: 2,
+			finalIsVar:    true,
+		},
+		{
+			name:          "3 * ~4",
+			postfix:       "3 4 ~ *",
+			expectedCount: 2,
+			finalIsVar:    true,
+		},
+		{
+			name:          "~~5 = 5",
+			postfix:       "5 ~ ~",
+			expectedCount: 2,
+			finalIsVar:    true,
+		},
+		{
+			name:          "~(2 + 3) = -5",
+			postfix:       "2 3 + ~",
+			expectedCount: 2,
+			finalIsVar:    true,
 		},
 	}
 
@@ -245,7 +323,7 @@ func TestExpression_Convert(t *testing.T) {
 			name:     "Invalid syntax",
 			input:    "2 + + 3",
 			expected: "",
-			wantErr:  false, // govaluate может пропустить, но Check() поймает
+			wantErr:  true, // govaluate может пропустить, но Check() поймает
 		},
 		{
 			name:     "Empty input",
@@ -257,6 +335,36 @@ func TestExpression_Convert(t *testing.T) {
 			name:     "Single number",
 			input:    "42",
 			expected: "42",
+			wantErr:  false,
+		},
+		{
+			name:     "Unary minus: ~2",
+			input:    "~2",
+			expected: "2 ~",
+			wantErr:  false,
+		},
+		{
+			name:     "Unary minus in expression: ~2 + 3",
+			input:    "~2 + 3",
+			expected: "2 ~ 3 +",
+			wantErr:  false,
+		},
+		{
+			name:     "Unary minus with multiplication: 3 * ~4",
+			input:    "3 * ~4",
+			expected: "3 4 ~ *",
+			wantErr:  false,
+		},
+		{
+			name:     "Double unary: ~~5",
+			input:    "~(~5)",
+			expected: "5 ~ ~",
+			wantErr:  false,
+		},
+		{
+			name:     "Complex: ~(2 + 3)",
+			input:    "~(2 + 3)",
+			expected: "2 3 + ~",
 			wantErr:  false,
 		},
 	}

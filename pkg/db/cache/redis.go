@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/tainj/distributed_calculator2/pkg/logger"
 )
 
 type Config struct {
@@ -18,16 +18,17 @@ type CACHE struct {
 	Client *redis.Client
 }
 
-func New(cfg Config) *CACHE {
+func New(cfg Config, l logger.Logger) *CACHE {
 	client := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
 	})
 
 	// Простая проверка без таймаута
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		log.Printf("Redis connection warning: %v", err) // не фатальная ошибка
+		l.Warn(context.Background(), "redis connection warning", "error", err) // не фатальная ошибка
 	} else {
-		log.Println("Redis connected")
+		l.Info(context.Background(), "redis connected")
+
 	}
 
 	return &CACHE{Client: client}

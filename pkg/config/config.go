@@ -2,11 +2,13 @@ package config
 
 import (
 	"log"
+
 	"github.com/caarlos0/env/v8"
 	"github.com/joho/godotenv"
-	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
+	"github.com/tainj/distributed_calculator2/internal/auth"
 	"github.com/tainj/distributed_calculator2/pkg/db/cache"
 	"github.com/tainj/distributed_calculator2/pkg/db/postgres"
+	"github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
 type GRPCServer struct {
@@ -19,6 +21,7 @@ type Config struct {
 	Redis cache.Config
     Grpc  GRPCServer
     Kafka kafka.Config
+    JWT auth.Config
 }
 
 func LoadConfig() (*Config, error) {
@@ -42,6 +45,10 @@ func LoadConfig() (*Config, error) {
     }
 
     if err := env.Parse(&cfg.Kafka); err != nil {
+        return nil, err
+    }
+
+    if err := env.Parse(&cfg.JWT); err != nil {
         return nil, err
     }
     

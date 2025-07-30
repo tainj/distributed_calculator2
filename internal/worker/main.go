@@ -1,83 +1,135 @@
 // internal/worker/worker.go
+
 package worker
 
 import (
     "context"
     "encoding/json"
     "fmt"
-    "log"
+    "net/http"
+    "sync"
 
     "github.com/tainj/distributed_calculator2/internal/models"
-    "github.com/tainj/distributed_calculator2/internal/repository"
+    repo "github.com/tainj/distributed_calculator2/internal/repository"
     "github.com/tainj/distributed_calculator2/internal/valueprovider"
     "github.com/tainj/distributed_calculator2/pkg/calculator"
+    "github.com/tainj/distributed_calculator2/pkg/logger"
     "github.com/tainj/distributed_calculator2/pkg/messaging/kafka"
 )
 
 type Worker struct {
-    exampleRepo   repository.ExampleRepository
-    cacheRepo     repository.CacheRepository
+    exampleRepo   repo.ExampleRepository
+    cacheRepo     repo.VariableRepository
     kafkaQueue    kafka.TaskQueue
     valueProvider valueprovider.Provider
+    logger        logger.Logger
+
+    // для graceful shutdown
+    ctx    context.Context
+    cancel context.CancelFunc
+    wg     sync.WaitGroup
+
+    // для HTTP сервера
+    httpServer *http.Server
+    port       string
 }
 
 func NewWorker(
-    exampleRepo repository.ExampleRepository,
-    cacheRepo repository.CacheRepository,
+    exampleRepo repo.ExampleRepository,
+    cacheRepo repo.VariableRepository,
     kafkaQueue kafka.TaskQueue,
     valueProvider valueprovider.Provider,
+    logger logger.Logger,
+    port string,
 ) *Worker {
+    ctx, cancel := context.WithCancel(context.Background())
     return &Worker{
         exampleRepo:   exampleRepo,
         cacheRepo:     cacheRepo,
         kafkaQueue:    kafkaQueue,
         valueProvider: valueProvider,
+        logger:        logger,
+        ctx:           ctx,
+        cancel:        cancel,
+        port:          port,
     }
 }
 
 func (w *Worker) Start() {
-    log.Println("Worker started, reading tasks from Kafka...")
+    // Запускаем HTTP сервер
+    w.startHTTPServer()
+
+    // Запускаем Kafka consumer
+    w.wg.Add(1)
+    go w.consumeLoop()
+}
+
+func (w *Worker) consumeLoop() {
+    defer w.wg.Done()
+    w.logger.Info(w.ctx, "worker started, reading tasks from kafka...")
+
     for {
-        ctx := context.Background()
+        select {
+        case <-w.ctx.Done():
+            w.logger.Info(w.ctx, "consume loop stopped due to shutdown")
+            return
+        default:
+            // читаем сообщение
+            jsonData, message, err := w.kafkaQueue.ReadTask()
+            if err != nil {
+                w.logger.Error(w.ctx, "failed to read task", "error", err)
+                continue
+            }
 
-        // Читаем сообщение
-        jsonData, message, err := w.kafkaQueue.ReadTask()
-        if err != nil {
-            log.Printf("Failed to read task from Kafka: %v", err)
-            continue
-        }
+            var task models.Task
+            if err := json.Unmarshal(jsonData, &task); err != nil {
+                w.logger.Error(w.ctx, "failed to unmarshal task", "error", err)
+                continue
+            }
+            w.logger.Debug(w.ctx, "received task", "raw_json", string(jsonData))
+            w.logger.Debug(w.ctx, "unmarshaled task", "task", fmt.Sprintf("%+v", task))
 
-        var task models.Task
-        if err := json.Unmarshal(jsonData, &task); err != nil {
-            log.Printf("Failed to unmarshal task: %v", err)
-            continue
-        }
+            // обрабатываем таск
+            result, err := w.ProcessTask(w.ctx, task)
 
-        // Обрабатываем таск
-        result, err := w.ProcessTask(ctx, task)
-		if err != nil {
-            log.Printf("Failed to process task %s: %v", task.Variable, err)
-            continue // ❌ не коммитим → Kafka повторит
-        }
+            // бизнес-ошибки: деление на ноль, синтаксис
+            if err != nil && (err == calculator.ErrDivisionByZero || err == calculator.ErrCovertExample) {
+                w.logger.Debug(w.ctx, "business error in task", "task Variable", task.Variable, "error", err)
+                if errDB := w.exampleRepo.UpdateExampleWithError(w.ctx, task.ExampleID, err.Error()); errDB != nil {
+                    w.logger.Error(w.ctx, "failed to save error to db", "error", errDB)
+                    continue
+                }
+                if errCommit := w.kafkaQueue.Commit(message); errCommit != nil {
+                    w.logger.Error(w.ctx, "failed to commit after error", "error", errCommit)
+                    continue
+                }
+                continue
+            }
 
-        // ✅ Коммитим только при успехе
-        if err := w.kafkaQueue.Commit(message); err != nil {
-            log.Printf("Failed to commit message: %v", err)
-            continue
-        }
+            // инфра-ошибки: redis, сеть — не коммитим, Kafka повторит
+            if err != nil {
+                w.logger.Error(w.ctx, "infra error, will retry", "error", err)
+                continue
+            }
 
-        // ✅ Проверяем, финальный ли это таск
-        if task.IsFinal {
-            if err := w.handleFinalTask(ctx, task, result); err != nil {
-                log.Printf("Failed to handle final task %s: %v", task.Variable, err)
-                // ❌ Не коммитим? Нет, уже коммитили. Но можно не обновлять статус.
+            // всё ок — коммитим
+            if err := w.kafkaQueue.Commit(message); err != nil {
+                w.logger.Error(w.ctx, "failed to commit message", "error", err)
+                continue
+            }
+
+            // если финальный — сохраняем результат
+            if task.IsFinal {
+                if err := w.handleFinalTask(w.ctx, task, result); err != nil {
+                    w.logger.Error(w.ctx, "failed to save final result", "error", err)
+                }
             }
         }
     }
 }
 
-// ProcessTask — выполняет вычисление и сохраняет в Redis
 func (w *Worker) ProcessTask(ctx context.Context, task models.Task) (float64, error) {
+    w.logger.Info(ctx, "processing task", "task", fmt.Sprintf("%+v", task))
     val1, err := w.valueProvider.Resolve(ctx, task.Num1)
     if err != nil {
         return 0, fmt.Errorf("resolve num1 (%s): %w", task.Num1, err)
@@ -90,24 +142,82 @@ func (w *Worker) ProcessTask(ctx context.Context, task models.Task) (float64, er
     calc := calculator.NewNode(val1, val2, task.Sign)
     result, err := calc.Calculate()
     if err != nil {
-        return 0, fmt.Errorf("calculate %f %s %f: %w", val1, task.Sign, val2, err)
+        return 0, err
     }
 
-    // Сохраняем в Redis
     if err := w.cacheRepo.SetResult(ctx, task.Variable, result); err != nil {
         return 0, fmt.Errorf("save result to Redis: %w", err)
     }
 
-    log.Printf("Task processed: %f %s %f = %f → %s", val1, task.Sign, val2, result, task.Variable)
+    w.logger.Info(ctx, "task processed",
+        "num1", val1,
+        "sign", task.Sign,
+        "num2", val2,
+        "result", result,
+        "response", task.Variable,
+    )
     return result, nil
 }
 
-// handleFinalTask — обновляет Example в БД
 func (w *Worker) handleFinalTask(ctx context.Context, task models.Task, result float64) error {
+    w.logger.Info(ctx, "trying to save final result", "example_id", task.ExampleID, "result", result)
     if err := w.exampleRepo.UpdateExample(ctx, task.ExampleID, result); err != nil {
         return fmt.Errorf("update example in DB: %w", err)
     }
-
-    log.Printf("Final result saved: example=%s, result=%f", task.ExampleID, result)
+    w.logger.Info(ctx, "final result saved", "example", task.ExampleID, "result", result)
     return nil
+}
+
+// startHTTPServer — запускает /health
+func (w *Worker) startHTTPServer() {
+    mux := http.NewServeMux()
+    
+    // Обработчик для /health
+    mux.HandleFunc("/health", func(rw http.ResponseWriter, r *http.Request) {
+        // Добавляем CORS-заголовки
+        rw.Header().Set("Access-Control-Allow-Origin", "*")                    // Разрешаем всем
+        rw.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")   // Разрешённые методы
+        rw.Header().Set("Access-Control-Allow-Headers", "Content-Type")         // Разрешённые заголовки
+        
+        // Обрабатываем preflight OPTIONS запрос
+        if r.Method == "OPTIONS" {
+            rw.WriteHeader(http.StatusOK)
+            return
+        }
+        
+        // Ответ на POST/GET
+        rw.Header().Set("Content-Type", "application/json")
+        rw.WriteHeader(http.StatusOK)
+        rw.Write([]byte(`{"status":"alive", "port":"` + w.port + `"}`))
+    })
+
+    w.httpServer = &http.Server{
+        Addr:    ":" + w.port,
+        Handler: mux,
+    }
+
+    w.wg.Add(1)
+    go func() {
+        defer w.wg.Done()
+        w.logger.Info(w.ctx, "health server started", "port", w.port)
+        if err := w.httpServer.ListenAndServe(); err != http.ErrServerClosed {
+            w.logger.Error(w.ctx, "health server failed", "error", err)
+        }
+    }()
+}
+
+// Stop — graceful shutdown
+func (w *Worker) Stop() {
+    w.logger.Info(w.ctx, "shutting down worker...")
+    w.cancel() // останавливаем consumer
+
+    // останавливаем HTTP сервер
+    if w.httpServer != nil {
+        if err := w.httpServer.Shutdown(context.Background()); err != nil {
+            w.logger.Error(w.ctx, "failed to shutdown http server", "error", err)
+        }
+    }
+
+    w.wg.Wait()
+    w.logger.Info(w.ctx, "worker stopped gracefully")
 }
