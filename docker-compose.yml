@@ -153,11 +153,20 @@ services:
         condition: service_healthy
     command: >
       sh -c '
-      echo "Ожидание Kafka..." &&
-      sleep 15 &&
-      kafka-topics --bootstrap-server kafka-1:9092 --create --topic calculator_tasks --partitions 3 --replication-factor 1 &&
-      echo "✅ Топик calculator_tasks создан с 3 партициями" &&
-      kafka-topics --bootstrap-server kafka-1:9092 --list
+        echo "Ожидание Kafka..." &&
+        sleep 15 &&
+        
+        # Проверяем, существует ли топик
+        if kafka-topics --bootstrap-server kafka-1:9092 --list | grep -q "calculator_tasks"; then
+          echo "✅ Топик calculator_tasks уже существует"
+        else
+          echo "Создаю топик calculator_tasks..."
+          kafka-topics --bootstrap-server kafka-1:9092 --create --topic calculator_tasks --partitions 3 --replication-factor 1 &&
+          echo "✅ Топик calculator_tasks создан"
+        fi &&
+        
+        echo "Список топиков:" &&
+        kafka-topics --bootstrap-server kafka-1:9092 --list
       '
     networks:
       - calculator-network
