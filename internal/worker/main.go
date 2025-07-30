@@ -86,6 +86,8 @@ func (w *Worker) consumeLoop() {
                 w.logger.Error(w.ctx, "failed to unmarshal task", "error", err)
                 continue
             }
+            w.logger.Debug(w.ctx, "received task", "raw_json", string(jsonData))
+            w.logger.Debug(w.ctx, "unmarshaled task", "task", fmt.Sprintf("%+v", task))
 
             // обрабатываем таск
             result, err := w.ProcessTask(w.ctx, task)
@@ -127,6 +129,7 @@ func (w *Worker) consumeLoop() {
 }
 
 func (w *Worker) ProcessTask(ctx context.Context, task models.Task) (float64, error) {
+    w.logger.Info(ctx, "processing task", "task", fmt.Sprintf("%+v", task))
     val1, err := w.valueProvider.Resolve(ctx, task.Num1)
     if err != nil {
         return 0, fmt.Errorf("resolve num1 (%s): %w", task.Num1, err)
@@ -157,6 +160,7 @@ func (w *Worker) ProcessTask(ctx context.Context, task models.Task) (float64, er
 }
 
 func (w *Worker) handleFinalTask(ctx context.Context, task models.Task, result float64) error {
+    w.logger.Info(ctx, "trying to save final result", "example_id", task.ExampleID, "result", result)
     if err := w.exampleRepo.UpdateExample(ctx, task.ExampleID, result); err != nil {
         return fmt.Errorf("update example in DB: %w", err)
     }
@@ -167,7 +171,21 @@ func (w *Worker) handleFinalTask(ctx context.Context, task models.Task, result f
 // startHTTPServer — запускает /health
 func (w *Worker) startHTTPServer() {
     mux := http.NewServeMux()
+    
+    // Обработчик для /health
     mux.HandleFunc("/health", func(rw http.ResponseWriter, r *http.Request) {
+        // Добавляем CORS-заголовки
+        rw.Header().Set("Access-Control-Allow-Origin", "*")                    // Разрешаем всем
+        rw.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")   // Разрешённые методы
+        rw.Header().Set("Access-Control-Allow-Headers", "Content-Type")         // Разрешённые заголовки
+        
+        // Обрабатываем preflight OPTIONS запрос
+        if r.Method == "OPTIONS" {
+            rw.WriteHeader(http.StatusOK)
+            return
+        }
+        
+        // Ответ на POST/GET
         rw.Header().Set("Content-Type", "application/json")
         rw.WriteHeader(http.StatusOK)
         rw.Write([]byte(`{"status":"alive", "port":"` + w.port + `"}`))

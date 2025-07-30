@@ -47,6 +47,7 @@ export default function Navbar() {
           <>
             <NavLink to="/calc">Калькулятор</NavLink>
             <NavLink to="/examples">История</NavLink>
+            <NavLink to="/workers" style={linkStyle}>📡 Воркеры</NavLink>
             <NavLink to="/about">О проекте</NavLink>
 
             {/* Иконка пользователя */}

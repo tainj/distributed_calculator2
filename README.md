@@ -15,3 +15,15 @@ protoc -I ./proto --go_out ./pkg/api/ --go_opt paths=source_relative --go-grpc_o
 ```bash
 psql -h localhost -p 5432 -U calculator -d calculator_db
 ```
+
+# Сборка и запуск
+```bash
+# 1. Остановить и удалить ВСЁ, включая тома
+docker-compose down -v
+
+# 2. Пересобрать образы (чтобы точно не было кеша)
+docker-compose build --no-cache
+
+# 3. Запустить стек
+docker-compose up
+```

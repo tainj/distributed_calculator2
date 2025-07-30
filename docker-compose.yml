@@ -145,6 +145,23 @@ services:
       - calculator-network
     restart: "no"
 
+    # === CREATE TOPICS ===
+  create-topics:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+    command: >
+      sh -c '
+      echo "Ожидание Kafka..." &&
+      sleep 15 &&
+      kafka-topics --bootstrap-server kafka-1:9092 --create --topic calculator_tasks --partitions 3 --replication-factor 1 &&
+      echo "✅ Топик calculator_tasks создан с 3 партициями" &&
+      kafka-topics --bootstrap-server kafka-1:9092 --list
+      '
+    networks:
+      - calculator-network
+
   # === API СЕРВЕР ===
   api:
     build: .
@@ -159,18 +176,14 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      create-topics:
+        condition: service_completed_successfully
       kafka-1:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - calculator-network
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
   # === ВОРКЕРЫ ===
   worker1:
@@ -185,6 +198,8 @@ services:
       - "8081:8081"
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      create-topics:
         condition: service_completed_successfully
       api:
         condition: service_started
@@ -204,6 +219,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      create-topics:
+        condition: service_completed_successfully
       api:
         condition: service_started
     networks:
@@ -221,6 +238,8 @@ services:
       - "8083:8083"
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      create-topics:
         condition: service_completed_successfully
       api:
         condition: service_started
